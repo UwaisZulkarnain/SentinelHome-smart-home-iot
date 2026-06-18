@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🏠 Smart Home IoT Dashboard</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { 
+    font-family: 'Segoe UI', system-ui, sans-serif; 
+    background: #0a0e27; color: #e0e6ed;
+    min-height: 100vh; padding: 20px;
+  }
+  .header { text-align:center; margin-bottom: 24px; }
+  .header h1 { font-size: 2rem; color: #60a5fa; }
+  .status-dot { display:inline-block; width:12px; height:12px; border-radius:50%; margin-right:8px; }
+  .status-ok { background:#22c55e; box-shadow:0 0 8px #22c55e; }
+  .status-warn { background:#f59e0b; box-shadow:0 0 8px #f59e0b; }
+  .status-danger { background:#ef4444; box-shadow:0 0 8px #ef4444; }
+  .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; max-width:1200px; margin:0 auto; }
+  .card {
+    background: rgba(30,41,59,0.8); border:1px solid rgba(96,165,250,0.2);
+    border-radius: 16px; padding: 20px; text-align:center;
+    backdrop-filter: blur(10px); transition: transform 0.2s;
+  }
+  .card:hover { transform: translateY(-4px); }
+  .card-icon { font-size: 2.5rem; margin-bottom: 8px; }
+  .card-value { font-size: 2.2rem; font-weight: 700; margin: 8px 0; }
+  .card-label { font-size: 0.9rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; }
+  .card-status { margin-top: 10px; padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; display:inline-block; }
+  .ok { background: rgba(34,197,94,0.15); color: #22c55e; }
+  .warn { background: rgba(245,158,11,0.15); color: #f59e0b; }
+  .danger { background: rgba(239,68,68,0.15); color: #ef4444; }
+  .chart-container { max-width: 1200px; margin: 24px auto; background: rgba(30,41,59,0.8); border-radius: 16px; padding: 20px; }
+  .chart-title { color: #60a5fa; margin-bottom: 12px; font-size: 1.1rem; }
+  .chart-canvas { width: 100%; height: 200px; }
+  .log { max-width: 1200px; margin: 24px auto; background: rgba(30,41,59,0.8); border-radius: 16px; padding: 16px; font-family: monospace; font-size: 0.8rem; max-height: 200px; overflow-y: auto; }
+  .log-entry { padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .log-time { color: #60a5fa; margin-right: 8px; }
+  .controls { max-width: 1200px; margin: 16px auto; text-align: center; }
+  button { background: #3b82f6; color: white; border: none; padding: 10px 24px; border-radius: 8px; cursor: pointer; font-size: 1rem; margin: 0 4px; }
+  button:hover { background: #2563eb; }
+  button:disabled { background: #475569; cursor: not-allowed; }
+  .input-group { margin: 8px; }
+  input { background: #1e293b; border: 1px solid #334155; color: #e0e6ed; padding: 8px 12px; border-radius: 6px; width: 300px; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>🏠 Smart Home IoT Dashboard</h1>
+  <p><span class="status-dot status-ok" id="connDot"></span><span id="connText">Disconnected</span> | Packets: <span id="pktCount">0</span> | Last Update: <span id="lastUpdate">Never</span></p>
+</div>
+
+<div class="controls">
+  <div class="input-group">
+    <input type="text" id="wsUrl" placeholder="ws://localhost:8080 or Paste serial data here" value="ws://localhost:8080">
+    <button id="connectBtn" onclick="toggleConnect()">Connect</button>
+    <button onclick="simulateData()">Simulate Data</button>
+    <button onclick="clearLog()">Clear Log</button>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <div class="card-icon">🌡️</div>
+    <div class="card-value" id="valTemp">--</div>
+    <div class="card-label">Temperature</div>
+    <div class="card-status ok" id="statTemp">Waiting...</div>
+  </div>
+  <div class="card">
+    <div class="card-icon">💧</div>
+    <div class="card-value" id="valHum">--</div>
+    <div class="card-label">Humidity</div>
+    <div class="card-status ok" id="statHum">Waiting...</div>
+  </div>
+  <div class="card">
+    <div class="card-icon">🚶</div>
+    <div class="card-value" id="valMotion">--</div>
+    <div class="card-label">Motion</div>
+    <div class="card-status ok" id="statMotion">Waiting...</div>
+  </div>
+  <div class="card">
+    <div class="card-icon">🔥</div>
+    <div class="card-value" id="valGas">--</div>
+    <div class="card-label">Gas/Smoke</div>
+    <div class="card-status ok" id="statGas">Waiting...</div>
+  </div>
+  <div class="card">
+    <div class="card-icon">🚨</div>
+    <div class="card-value" id="valAlarm">--</div>
+    <div class="card-label">Alarm</div>
+    <div class="card-status ok" id="statAlarm">Waiting...</div>
+  </div>
+</div>
+
+<div class="chart-container">
+  <div class="chart-title">📈 Temperature & Humidity History</div>
+  <canvas id="chartCanvas" class="chart-canvas"></canvas>
+</div>
+
+<div class="log" id="logPanel">
+  <div class="log-entry"><span class="log-time">--:--:--</span> Dashboard initialized. Waiting for data...</div>
+</div>
+
+<script>
+// ─── STATE ───
+let ws = null;
+let connected = false;
+let packets = 0;
+let history = { temp: [], hum: [], labels: [] };
+const MAX_POINTS = 50;
+
+// ─── CHART ───
+const canvas = document.getElementById('chartCanvas');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+  canvas.width = canvas.offsetWidth * window.devicePixelRatio;
+  canvas.height = canvas.offsetHeight * window.devicePixelRatio;
+  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+function drawChart() {
+  const w = canvas.offsetWidth, h = canvas.offsetHeight;
+  ctx.clearRect(0, 0, w, h);
+
+  if (history.temp.length < 2) return;
+
+  // Grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 1;
+  for (let i=0; i<5; i++) {
+    let y = h - (h/5)*i;
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke();
+  }
+
+  // Temp line
+  const all = [...history.temp, ...history.hum];
+  const min = Math.min(...all) - 2, max = Math.max(...all) + 2;
+  const range = max - min || 1;
+
+  function drawLine(data, color, fill) {
+    ctx.strokeStyle = color; ctx.lineWidth = 2;
+    ctx.beginPath();
+    data.forEach((v, i) => {
+      const x = (i / (MAX_POINTS-1)) * w;
+      const y = h - ((v - min) / range) * (h - 30) - 15;
+      if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+    // Fill
+    ctx.fillStyle = fill;
+    ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath(); ctx.fill();
+  }
+
+  drawLine(history.temp, '#ef4444', 'rgba(239,68,68,0.1)');
+  drawLine(history.hum, '#3b82f6', 'rgba(59,130,246,0.1)');
+
+  // Labels
+  ctx.fillStyle = '#94a3b8'; ctx.font = '11px sans-serif';
+  ctx.fillText(`Temp range: ${min.toFixed(1)} - ${max.toFixed(1)}`, 10, 15);
+}
+
+// ─── UPDATE UI ───
+function updateCard(id, value, status, isDanger) {
+  document.getElementById('val' + id).textContent = value;
+  const el = document.getElementById('stat' + id);
+  el.textContent = status;
+  el.className = 'card-status ' + (isDanger ? 'danger' : 'ok');
+}
+
+function log(msg) {
+  const panel = document.getElementById('logPanel');
+  const time = new Date().toLocaleTimeString();
+  panel.innerHTML = `<div class="log-entry"><span class="log-time">${time}</span>${msg}</div>` + panel.innerHTML;
+  if (panel.children.length > 50) panel.lastChild.remove();
+}
+
+function processData(data) {
+  packets++;
+  document.getElementById('pktCount').textContent = packets;
+  document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+
+  const t = parseFloat(data.t ?? data.temp ?? data.temperature ?? 0);
+  const h = parseFloat(data.h ?? data.hum ?? data.humidity ?? 0);
+  const m = !!(data.m ?? data.motion ?? 0);
+  const g = !!(data.g ?? data.gas ?? 0);
+  const a = !!(data.a ?? data.alarm ?? 0);
+
+  updateCard('Temp', t.toFixed(1) + ' °C', t > 35 ? 'HIGH TEMP!' : 'Normal', t > 35);
+  updateCard('Hum', h.toFixed(1) + ' %', h > 80 ? 'HIGH HUMIDITY!' : 'Normal', h > 80);
+  updateCard('Motion', m ? 'YES' : 'NO', m ? 'DETECTED' : 'Clear', m);
+  updateCard('Gas', g ? 'DETECTED' : 'Clear', g ? 'GAS ALERT!' : 'Safe', g);
+  updateCard('Alarm', a ? 'ACTIVE' : 'OFF', a ? 'ALARM ON' : 'Standby', a);
+
+  // History
+  history.temp.push(t); history.hum.push(h);
+  if (history.temp.length > MAX_POINTS) { history.temp.shift(); history.hum.shift(); }
+  drawChart();
+
+  if (g || a || t > 35 || h > 80) {
+    log(`⚠️ ALERT: ${g?'Gas ':''}${a?'Alarm ':''}${t>35?'HighTemp ':''}${h>80?'HighHum ':''}`);
+  }
+}
+
+// ─── WEBSOCKET ───
+function toggleConnect() {
+  if (connected) {
+    ws.close();
+  } else {
+    const url = document.getElementById('wsUrl').value;
+    ws = new WebSocket(url);
+    ws.onopen = () => {
+      connected = true;
+      document.getElementById('connectBtn').textContent = 'Disconnect';
+      document.getElementById('connDot').className = 'status-dot status-ok';
+      document.getElementById('connText').textContent = 'Connected';
+      log('WebSocket connected');
+    };
+    ws.onmessage = (e) => {
+      try { processData(JSON.parse(e.data)); }
+      catch { 
+        // Try parsing JSON: prefix
+        const m = e.data.match(/JSON:(.+)/);
+        if (m) try { processData(JSON.parse(m[1])); } catch {}
+      }
+    };
+    ws.onclose = () => {
+      connected = false;
+      document.getElementById('connectBtn').textContent = 'Connect';
+      document.getElementById('connDot').className = 'status-dot status-danger';
+      document.getElementById('connText').textContent = 'Disconnected';
+      log('WebSocket disconnected');
+    };
+    ws.onerror = (e) => log('WebSocket error: ' + e.type);
+  }
+}
+
+// ─── SIMULATE ───
+function simulateData() {
+  let i = 0;
+  const interval = setInterval(() => {
+    processData({
+      t: 25 + Math.sin(i/10)*3 + Math.random()*2,
+      h: 50 + Math.cos(i/8)*10 + Math.random()*5,
+      m: Math.random() > 0.9,
+      g: Math.random() > 0.95,
+      a: Math.random() > 0.92
+    });
+    i++;
+    if (i > 100) clearInterval(interval);
+  }, 800);
+  log('Simulation started (100 packets)');
+}
+
+function clearLog() {
+  document.getElementById('logPanel').innerHTML = '';
+}
+
+// ─── SERIAL PASTE MODE ───
+// You can also paste serial output directly into the URL input and hit Enter
+document.getElementById('wsUrl').addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') {
+    const val = e.target.value;
+    if (val.startsWith('JSON:')) {
+      try { processData(JSON.parse(val.replace('JSON:',''))); }
+      catch { log('Invalid JSON format'); }
+    }
+  }
+});
+
+log('Dashboard ready. Click "Simulate Data" to test, or connect to WebSocket.');
+</script>
+</body>
+</html>
