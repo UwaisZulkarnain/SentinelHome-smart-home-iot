@@ -4,11 +4,12 @@
 #include <DHT.h>
 
 // === SENSOR PINS ===
-#define PIR_PIN      2
-#define MQ2_PIN      5
-#define DHT_PIN      9
-#define LED_PIN      6
-#define BUZZER_PIN   7
+// Physical wiring: MQ=D8(GPIO7), PIR=D9(GPIO8), DHT=D10(GPIO9)
+#define MQ2_PIN      7   // D8 = GPIO7
+#define PIR_PIN      8   // D9 = GPIO8
+#define DHT_PIN      9   // D10 = GPIO9
+#define LED_PIN      43   // D6 = GPIO43, external LED already wired here
+#define BUZZER_PIN   44   // D7 = GPIO44, placeholder until buzzer is wired
 
 // === SENSOR CONFIG ===
 #define DHT_TYPE     DHT11  

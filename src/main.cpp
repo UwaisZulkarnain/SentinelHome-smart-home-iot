@@ -1,14 +1,16 @@
 #include <Arduino.h>
 #include <DHT.h>
 #include <WiFi.h>
+#include <HTTPClient.h>
 #include "config.h"
-
-#include <WiFiManager.h>
 
 DHT dht(DHT_PIN, DHT_TYPE);
 WiFiServer server(80);
 
-unsigned long lastDHT = 0, lastPIR = 0, lastMQ2 = 0, buzzerStart = 0;
+const char* SUPABASE_URL = "https://ubcyktzfiylqirzpdqnu.supabase.co";
+const char* SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InViY3lrdHpmaXlscWlyenBkcW51Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MDkxNjQsImV4cCI6MjA5NzM4NTE2NH0.Gu0jBFdVnsBMFF2VWliTnoKtBqCt_-IwSQfnoe2ts9c";
+
+unsigned long lastDHT = 0, lastPIR = 0, lastMQ2 = 0, buzzerStart = 0, lastSupabase = 0;
 bool buzzerOn = false, motion = false, gas = false;
 float temp = 0, hum = 0;
 
@@ -23,12 +25,12 @@ void setup() {
   digitalWrite(BUZZER_PIN, LOW);
   dht.begin();
 
-  WiFiManager wm;
-  wm.setConfigPortalTimeout(180);
-  if (!wm.autoConnect("XIAO-SmartHome")) {
-    ESP.restart();
+  WiFi.begin("Uwais iph", "sarrah123");
+  int tries = 0;
+  while (WiFi.status() != WL_CONNECTED && tries < 20) {
+    delay(500);
+    tries++;
   }
-  Serial.println();
   Serial.print("IP:");
   Serial.println(WiFi.localIP());
 
@@ -43,13 +45,36 @@ void setup() {
   Serial.println("Ready");
 }
 
+void pushToSupabase() {
+  if (WiFi.status() != WL_CONNECTED) return;
+  HTTPClient http;
+  String url = String(SUPABASE_URL) + "/rest/v1/sensor_readings";
+  http.begin(url);
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("apikey", SUPABASE_KEY);
+  http.addHeader("Authorization", String("Bearer ") + SUPABASE_KEY);
+  http.addHeader("Prefer", "return=minimal");
+  String body = "{\"temperature\":" + String(temp, 1) +
+                ",\"humidity\":" + String(hum, 1) +
+                ",\"motion\":" + String(motion ? 1 : 0) +
+                ",\"gas\":" + String(gas ? 1 : 0) +
+                ",\"alarm\":" + String(buzzerOn ? 1 : 0) + "}";
+  int code = http.POST(body);
+  Serial.printf("Supabase: %d\n", code);
+  http.end();
+}
+
 void loop() {
   unsigned long now = millis();
 
   if (now - lastDHT >= 2000) {
     float t = dht.readTemperature();
     float h = dht.readHumidity();
-    if (!isnan(t) && !isnan(h)) { temp = t; hum = h; }
+    if (!isnan(t) && !isnan(h)) { 
+      temp = t; hum = h;
+      Serial.printf("T:%.1f H:%.1f M:%d G:%d A:%d\n",
+        temp, hum, motion?1:0, gas?1:0, buzzerOn?1:0);
+    }
     lastDHT = now;
   }
 
@@ -57,10 +82,14 @@ void loop() {
     motion = digitalRead(PIR_PIN) == HIGH;
     lastPIR = now;
   }
-
   if (now - lastMQ2 >= 1000) {
     gas = digitalRead(MQ2_PIN) == LOW;
     lastMQ2 = now;
+  }
+
+  if (now - lastSupabase >= 10000) {
+    pushToSupabase();
+    lastSupabase = now;
   }
 
   if ((gas || temp > 35 || hum > 80 || motion) && !buzzerOn) {
