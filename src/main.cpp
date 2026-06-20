@@ -87,7 +87,7 @@ void loop() {
     lastMQ2 = now;
   }
 
-  if (now - lastSupabase >= 10000) {
+  if (now - lastSupabase >= 2000) {
     pushToSupabase();
     lastSupabase = now;
   }
