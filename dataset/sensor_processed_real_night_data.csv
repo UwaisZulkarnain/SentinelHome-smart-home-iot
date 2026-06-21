@@ -1,4 +1,4 @@
-created_at,temperature,humidity,motion,gas,alarm,is_night,motion_duration_sec,class,reason
+created_at,temperature,humidity,motion,gas,alarm,is_night,motion_duration_sec,alert_class,reason
 2026-06-21T01:13:14.878081,31.1,57.0,0,0,0,1,0,0,normal
 2026-06-21T01:13:16.883211,31.9,57.0,1,0,0,1,0,1,warm
 2026-06-21T01:13:18.888892,31.2,57.0,0,0,0,1,0,1,warm
