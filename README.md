@@ -37,7 +37,6 @@ Everyone else just needs to do their specific part below.
 | monitor.py | Terminal serial monitor, needs USB connection to XIAO |
 | simulator.py | Synthetic dataset generator |
 | tools/collect_serial.py | Real data collector via USB serial |
-| tools/collect_dataset.py | Dataset downloader from Supabase |
 | dataset/ | All CSV files |
 
 ---
@@ -171,23 +170,31 @@ with open("sentinelhome_model.pkl", "wb") as f:
 
 ## Born + Harris
 
-1. Build dashboard using Favoriot or Node-RED
-2. Pull live data from Supabase
-3. Show at minimum: temperature, humidity, motion, gas, alarm, alert_class
+Two options — pick whichever, or do both.
 
-To pull from Supabase:
+### Option A — Favoriot
+Limited to 500 API calls/day on free tier. Only suitable for short demo windows, not continuous logging. Device Developer ID and API key in WhatsApp.
 
-```python
-import requests
+### Option B — Node-RED (recommended, no limits)
+Pulls from the same Supabase table the Python dashboard uses.
 
-SUPABASE_URL = "https://ubcyktzfiylqirzpdqnu.supabase.co"
-SUPABASE_KEY = "check whatsapp"
+Steps:
+1. Install the `node-red-dashboard` palette (Menu → Manage palette → Install)
+2. Add an `inject` node, set to repeat every 10-30 seconds
+3. Add an `http request` node (GET method), URL:
+   ```
+   https://ubcyktzfiylqirzpdqnu.supabase.co/rest/v1/sensor_readings?select=*&order=created_at.desc&limit=1
+   ```
+   Headers:
+   ```
+   apikey: check WhatsApp
+   Authorization: Bearer check WhatsApp
+   ```
+4. Add a `json` node to parse the response
+5. Wire parsed fields into dashboard widgets:
+   temperature, humidity, motion, gas, alarm, is_night, motion_duration_sec, alert_class, reason
 
-r = requests.get(
-    f"{SUPABASE_URL}/rest/v1/sensor_readings?select=*&order=created_at.desc&limit=50",
-    headers={"apikey": SUPABASE_KEY}
-)
-```
+Flow: inject → http request → json → dashboard widgets
 
 ---
 
