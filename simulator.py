@@ -162,7 +162,7 @@ raw_file = f"dataset/sensor_class{target_class}_{time_label}_raw.csv"
 proc_file = f"dataset/sensor_class{target_class}_{time_label}_processed.csv"
 
 raw_cols = ["created_at","temperature","humidity","motion","gas","is_night","motion_duration_sec"]
-proc_cols = ["created_at","temperature","humidity","motion","gas","alarm","is_night","motion_duration_sec","class","reason"]
+proc_cols = ["created_at","temperature","humidity","motion","gas","alarm","is_night","motion_duration_sec","alert_class","reason"]
 
 with open(raw_file, "w", newline="") as rf, open(proc_file, "w", newline="") as pf:
     rw = csv.writer(rf)

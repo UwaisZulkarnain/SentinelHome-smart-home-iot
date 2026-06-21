@@ -22,7 +22,7 @@ raw_writer = csv.writer(raw_f)
 proc_writer = csv.writer(proc_f)
 
 raw_writer.writerow(["created_at","temperature","humidity","motion","gas","is_night","motion_duration_sec"])
-proc_writer.writerow(["created_at","temperature","humidity","motion","gas","alarm","is_night","motion_duration_sec","class","reason"])
+proc_writer.writerow(["created_at","temperature","humidity","motion","gas","alarm","is_night","motion_duration_sec","alert_class","reason"])
 
 print(f"Logging to:\n  {raw_file}\n  {processed_file}")
 print("Ctrl+C to stop\n")
