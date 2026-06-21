@@ -1,26 +1,48 @@
-# 🏠 SentinelHome — Smart Home IoT Monitoring System
-**ML for IoT | Group Project 2 | UTM 2025/2026**
+# SentinelHome — Smart Home IoT Monitoring System
+ML for IoT | Group Project 2 | UTM 2025/2026
 
 ---
 
-## 👥 Team
+## Team
 
 | Name | Role |
 |---|---|
-| Uwais | Hardware + Firmware |
-| Born + Harris | Favoriot Dashboard |
-| Khamsah | ML Model (Anomaly Detection) |
-| Aqasha | Demo + Testing |
+| Uwais | Hardware, Firmware, Data Collection |
+| Born + Harris | Favoriot / Node-RED Dashboard |
+| Khamsah | ML Model |
+| Aqasha | Demo + Presentation |
 
 ---
 
-## 🔧 Hardware
+## What Uwais Already Did
 
-- **Board:** Seeed Studio XIAO ESP32S3
-- **Sensors:** DHT11 (temp/humidity), PIR HC-SR501 (motion), MQ-2 (gas/smoke)
-- **Actuators:** LED indicator, Buzzer
+- XIAO ESP32S3 wired and working (DHT11, PIR, MQ-2, LED, Buzzer)
+- Firmware running with multi-class classification, night mode, motion timer, NTP sync
+- Live data pushing to Supabase every 2 seconds when hotspot is on
+- Python dashboard at localhost:5000
+- All datasets generated and in dataset/ folder
+- GitHub repo set up with all files
 
-**Pin Mapping:**
+Everyone else just needs to do their specific part below.
+
+---
+
+## Files
+
+| File | What it does |
+|---|---|
+| src/main.cpp | XIAO firmware |
+| src/config.h | Pin definitions |
+| dashboard.py | Live Python dashboard, pulls from XIAO direct with Supabase fallback |
+| monitor.py | Terminal serial monitor, needs USB connection to XIAO |
+| simulator.py | Synthetic dataset generator |
+| tools/collect_serial.py | Real data collector via USB serial |
+| tools/collect_dataset.py | Dataset downloader from Supabase |
+| dataset/ | All CSV files |
+
+---
+
+## Hardware Pins
 
 | Sensor | XIAO Pin | GPIO |
 |---|---|---|
@@ -30,88 +52,150 @@
 | LED | D6 | GPIO43 |
 | Buzzer | D7 | GPIO44 |
 
----
-
-## 🚀 Quick Start
-
-### Flash XIAO Firmware
-1. Open project in VSCode with PlatformIO
-2. Connect XIAO via USB
-3. `pio run --target upload --upload-port COM10`
-4. Turn on hotspot: **Uwais iph** / **sarrah123**
-5. XIAO connects automatically and starts pushing data
-
-### Run Local Dashboard
-pip install flask requests
-python dashboard.py
-Open http://localhost:5000
-
-### Collect ML Dataset (Khamsah)
-pip install requests
-python tools/collect_dataset.py
+XIAO hotspot: Uwais iph / sarrah123
+Static IP: 172.20.10.2
+Live data: http://172.20.10.2/data
 
 ---
 
-## ☁️ Supabase (Live Data)
+## Supabase
 
-- **Project URL:** https://ubcyktzfiylqirzpdqnu.supabase.co
-- **Table:** sensor_readings
-- **Anon Key:** (check WhatsApp group)
-- **Data rate:** 1 row per 10 seconds
+URL: https://ubcyktzfiylqirzpdqnu.supabase.co
+Table: sensor_readings
+Anon key: check WhatsApp
 
-**Columns:** created_at, temperature, humidity, motion, gas, alarm
-
----
-
-## 📡 XIAO HTTP API
-
-When XIAO is on hotspot (172.20.10.2):
-- Live data: http://172.20.10.2/data
-- Format: {"t":25.0,"h":45.0,"m":0,"g":0,"a":0}
+Columns:
+```
+created_at, temperature, humidity, motion, gas, alarm,
+is_night, motion_duration_sec, alert_class, reason
+```
 
 ---
 
-## 📁 Project Structure
+## Favoriot
 
-MLT_IOT_Project_2/
-├── src/
-│   ├── main.cpp          # XIAO firmware
-│   └── config.h          # Pin definitions
-├── dashboard.py          # Flask web dashboard
-├── monitor.py            # Terminal monitor
-├── tools/
-│   └── collect_dataset.py # Dataset collector for Khamsah
-├── dataset/              # CSV datasets (gitignored)
-└── platformio.ini
+Device Developer ID: SentinelHome_XIAO@emerizzanie
+API Key: check WhatsApp
 
 ---
 
-## 🧠 ML Pipeline (Khamsah)
+## Dataset
 
-- **Algorithm:** Isolation Forest
-- **Features:** temperature, humidity, motion, gas, alarm
-- **Training data:** normal baseline readings
-- **Anomaly data:** triggered sensor events
-- **Goal:** detect unusual sensor patterns = safety alert
+All CSVs are in dataset/ folder.
+
+Real data collected from actual XIAO:
+
+| File | Description |
+|---|---|
+| sensor_raw_day_real.csv | Real day baseline, raw |
+| sensor_processed_day_real.csv | Real day baseline, processed |
+| sensor_raw_20260621_real_night_data.csv | Real night baseline, raw |
+| sensor_processed_20260621_real_night_data.csv | Real night baseline, processed |
+
+Synthetic data generated via simulator.py (3000 rows each):
+
+| File | Class | Context |
+|---|---|---|
+| sensor_class0_day_raw/processed.csv | 0 Normal | Day |
+| sensor_class0_night_raw/processed.csv | 0 Normal | Night |
+| sensor_class1_day_raw/processed.csv | 1 Comfort Alert | Day |
+| sensor_class1_night_raw/processed.csv | 1 Comfort Alert | Night |
+| sensor_class2_day_raw/processed.csv | 2 Warning | Day |
+| sensor_class2_night_raw/processed.csv | 2 Warning | Night |
+| sensor_class3_day_raw/processed.csv | 3 Danger | Day |
+| sensor_class3_night_raw/processed.csv | 3 Danger | Night |
+
+Raw file columns:
+```
+created_at, temperature, humidity, motion, gas, is_night, motion_duration_sec
+```
+
+Processed file columns:
+```
+created_at, temperature, humidity, motion, gas, alarm, is_night, motion_duration_sec, alert_class, reason
+```
+
+Class definitions:
+
+| Class | Label | Trigger |
+|---|---|---|
+| 0 | Normal | Baseline temp/humidity, no gas, normal motion for time of day |
+| 1 | Comfort Alert | Temp 30-35C or humidity 70-80% or brief night motion under 5s |
+| 2 | Warning | Temp 35-40C or humidity 80%+ or sustained night motion 5-15s |
+| 3 | Danger | Gas detected or temp 40C+ or night intrusion 15s+ |
 
 ---
 
-## 📋 Demo Checklist (Aqasha)
+## Khamsah
 
-- [ ] XIAO powered on, hotspot active
-- [ ] dashboard.py running, open on browser
-- [ ] Supabase table showing live rows
-- [ ] Trigger PIR — motion detected
-- [ ] Trigger MQ-2 — gas detected
-- [ ] Blow on DHT11 — humidity spike
-- [ ] Show ML anomaly detection result
-- [ ] Favoriot dashboard live (Born)
+1. Clone repo or download dataset/ folder
+2. Use processed CSVs for training — they have the alert_class column
+3. Train on these features:
+
+```
+temperature, humidity, motion, gas, is_night, motion_duration_sec
+```
+
+Target column: alert_class (0, 1, 2, 3)
+
+4. Send Uwais the trained model as sentinelhome_model.pkl when done
+
+Quick start:
+
+```python
+import pandas as pd
+import glob
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report
+import pickle
+
+files = glob.glob("dataset/*_processed.csv")
+df = pd.concat([pd.read_csv(f) for f in files], ignore_index=True)
+
+features = ["temperature","humidity","motion","gas","is_night","motion_duration_sec"]
+X = df[features]
+y = df["alert_class"]
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+model = RandomForestClassifier(n_estimators=100, random_state=42)
+model.fit(X_train, y_train)
+
+print(classification_report(y_test, model.predict(X_test)))
+
+with open("sentinelhome_model.pkl", "wb") as f:
+    pickle.dump(model, f)
+```
 
 ---
 
-## ⚠️ Notes
+## Born + Harris
 
-- XIAO cannot connect to UTM WiFi (captive portal)
-- Always use Uwais phone hotspot for demo
-- MQ-2 needs 20s warmup after power on
-- PIR sensitivity adjusted — wave directly at dome to trigger
+1. Build dashboard using Favoriot or Node-RED
+2. Pull live data from Supabase
+3. Show at minimum: temperature, humidity, motion, gas, alarm, alert_class
+
+To pull from Supabase:
+
+```python
+import requests
+
+SUPABASE_URL = "https://ubcyktzfiylqirzpdqnu.supabase.co"
+SUPABASE_KEY = "check whatsapp"
+
+r = requests.get(
+    f"{SUPABASE_URL}/rest/v1/sensor_readings?select=*&order=created_at.desc&limit=50",
+    headers={"apikey": SUPABASE_KEY}
+)
+```
+
+---
+
+## Demo Checklist
+
+- XIAO cannot connect to UTM WiFi, always use Uwais hotspot
+- MQ-2 needs 20 seconds warmup after power on
+- PIR sensitivity adjusted, wave directly at dome to trigger
+- Night mode auto-detects 10pm-7am as night, 7am-10pm as day
+- Night mode can be manually overridden via dashboard buttons
+- alert_class column in Supabase and CSVs — do not rename to class (reserved word in PostgreSQL)
