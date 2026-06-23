@@ -1,0 +1,14 @@
+{
+  "timestamp": "2026-06-23T19:17:07.891276",
+  "temperature": 65.0,
+  "humidity": 25.0,
+  "motion": 1,
+  "gas": 900,
+  "is_night": 0,
+  "motion_duration_sec": 70,
+  "alert_class": 3,
+  "prediction": "High Alert",
+  "confidence": 1.0,
+  "led": "RED",
+  "buzzer": "ALARM"
+}
