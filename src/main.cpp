@@ -23,6 +23,7 @@ int currentClass = 0;
 String currentReason = "normal";
 bool cachedNight = false;
 unsigned long lastNightCheck = 0;
+bool supabasePushEnabled = false;
 
 void setup() {
   Serial.begin(115200);
@@ -189,7 +190,7 @@ void loop() {
 
   classify();
 
-  if (now - lastSupabase >= 2000) {
+  if (now - lastSupabase >= 2000 && supabasePushEnabled) {
     pushToSupabase();
     lastSupabase = now;
   }
@@ -208,6 +209,26 @@ void loop() {
   WiFiClient client = server.available();
   if (client) {
     String req = client.readStringUntil('\r');
+    if (req.indexOf("/supabase?on=1") != -1) {
+      supabasePushEnabled = true;
+      client.println("HTTP/1.1 200 OK");
+      client.println("Content-Type: application/json");
+      client.println("Connection: close");
+      client.println();
+      client.println("{\"supabasePush\":\"enabled\"}");
+      client.stop();
+      return;
+    }
+    if (req.indexOf("/supabase?on=0") != -1) {
+      supabasePushEnabled = false;
+      client.println("HTTP/1.1 200 OK");
+      client.println("Content-Type: application/json");
+      client.println("Connection: close");
+      client.println();
+      client.println("{\"supabasePush\":\"disabled\"}");
+      client.stop();
+      return;
+    }
     if (req.indexOf("/night?on=1") != -1) {
       nightModeOverride = 1;
       client.println("HTTP/1.1 200 OK");
@@ -243,8 +264,8 @@ void loop() {
       client.println("Content-Type: application/json");
       client.println("Connection: close");
       client.println();
-      client.printf("{\"t\":%.1f,\"h\":%.1f,\"m\":%d,\"g\":%d,\"a\":%d,\"n\":%d,\"dur\":%lu,\"class\":%d,\"reason\":\"%s\"}\n",
-        temp, hum, motion?1:0, gas?1:0, buzzerOn?1:0, isNight()?1:0, motionDurationSec, currentClass, currentReason.c_str());
+      client.printf("{\"t\":%.1f,\"h\":%.1f,\"m\":%d,\"g\":%d,\"a\":%d,\"n\":%d,\"dur\":%lu,\"class\":%d,\"reason\":\"%s\",\"push\":%d}\n",
+        temp, hum, motion?1:0, gas?1:0, buzzerOn?1:0, isNight()?1:0, motionDurationSec, currentClass, currentReason.c_str(), supabasePushEnabled?1:0);
     }
     client.stop();
   }
