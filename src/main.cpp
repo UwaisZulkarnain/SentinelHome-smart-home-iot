@@ -24,17 +24,26 @@ String currentReason = "normal";
 bool cachedNight = false;
 unsigned long lastNightCheck = 0;
 bool supabasePushEnabled = false;
+bool pushError = false;
 
 void setup() {
   Serial.begin(115200);
   pinMode(PIR_PIN, INPUT);
   pinMode(MQ2_PIN, INPUT);
-  pinMode(LED_PIN, OUTPUT);
   pinMode(BUZZER_PIN, OUTPUT);
   pinMode(DHT_PIN, INPUT_PULLUP);
-  digitalWrite(LED_PIN, HIGH);
   digitalWrite(BUZZER_PIN, LOW);
+  pinMode(STATUS_LED_PIN, OUTPUT);
+  digitalWrite(STATUS_LED_PIN, LOW);  // start OFF
+  pinMode(SUPABASE_JUMPER_PIN, INPUT_PULLUP);
   dht.begin();
+
+  // Read jumper state to set Supabase push default
+  if (digitalRead(SUPABASE_JUMPER_PIN) == LOW) {
+    supabasePushEnabled = true;
+  } else {
+    supabasePushEnabled = false;
+  }
 
   WiFi.begin("Uwais iph", "sarrah123");
   int tries = 0;
@@ -63,17 +72,18 @@ void setup() {
 
   for (int i = 20; i > 0; i--) {
     Serial.printf("Warmup:%ds\n", i);
-    digitalWrite(LED_PIN, !digitalRead(LED_PIN));
     delay(1000);
   }
-  digitalWrite(LED_PIN, HIGH);
   Serial.println("Ready");
 }
 
 bool isNight();
 void classify();
 void pushToSupabase() {
-  if (WiFi.status() != WL_CONNECTED) return;
+  if (WiFi.status() != WL_CONNECTED) {
+    pushError = true;
+    return;
+  }
   HTTPClient http;
   String url = String(SUPABASE_URL) + "/rest/v1/sensor_readings";
   http.begin(url);
@@ -91,6 +101,12 @@ void pushToSupabase() {
                 ",\"alert_class\":" + String(currentClass) +
                 ",\"reason\":\"" + currentReason + "\"}";
   int code = http.POST(body);
+  if (code == 201 || code == 200) {
+    pushError = false;
+    digitalWrite(STATUS_LED_PIN, HIGH);  // solid ON: success
+  } else {
+    pushError = true;
+  }
   Serial.printf("Supabase: %d\n", code);
   http.end();
 }
@@ -153,6 +169,25 @@ void classify() {
 void loop() {
   unsigned long now = millis();
 
+  // Hot-swap: check jumper state and update push enable in real time
+  static bool lastJumperState = !supabasePushEnabled;
+  bool jumperState = (digitalRead(SUPABASE_JUMPER_PIN) == LOW);
+  if (jumperState != lastJumperState) {
+    supabasePushEnabled = jumperState;
+    lastJumperState = jumperState;
+  }
+
+  // Status LED: OFF when push disabled
+  if (!supabasePushEnabled) {
+    pushError = false;
+    digitalWrite(STATUS_LED_PIN, LOW);
+  }
+
+  // Status LED: blink 1Hz when push error (WiFi down or HTTP error)
+  if (supabasePushEnabled && pushError) {
+    digitalWrite(STATUS_LED_PIN, (millis() / 500) % 2);
+  }
+
   if (now - lastDHT >= 2000) {
     float t = dht.readTemperature();
     float h = dht.readHumidity();
@@ -203,8 +238,6 @@ void loop() {
     buzzerOn = false;
     digitalWrite(BUZZER_PIN, LOW);
   }
-
-  digitalWrite(LED_PIN, (buzzerOn || gas) ? ((now/250)%2) : HIGH);
 
   WiFiClient client = server.available();
   if (client) {

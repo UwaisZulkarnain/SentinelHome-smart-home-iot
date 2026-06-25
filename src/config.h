@@ -8,8 +8,12 @@
 #define MQ2_PIN      7   // D8 = GPIO7
 #define PIR_PIN      8   // D9 = GPIO8
 #define DHT_PIN      9   // D10 = GPIO9
-#define LED_PIN      43   // D6 = GPIO43, external LED already wired here
 #define BUZZER_PIN   44   // D7 = GPIO44, placeholder until buzzer is wired
+
+// === STATUS LED ===
+// D1 = GPIO2. No resistor, direct drive. Cathode to GND.
+// Solid ON = pushing to Supabase, OFF = not pushing, Blink = push error
+#define STATUS_LED_PIN    2   // D1 = GPIO2
 
 // === SENSOR CONFIG ===
 #define DHT_TYPE     DHT11  
@@ -21,5 +25,7 @@
 #define GAS_THRESHOLD_HIGH 1       // MQ-2 DO pin convention: HIGH = no gas, LOW = gas detected.
 #define TEMP_THRESHOLD_HIGH 35.0   // °C - trigger alarm above this temperature.
 #define HUM_THRESHOLD_HIGH  80.0   // % - trigger alarm above this humidity.
+
+#define SUPABASE_JUMPER_PIN   1   // D0 = GPIO1. Jumper to GND = push ON.
 
 #endif
