@@ -167,8 +167,9 @@ def latest():
         try:
             r = requests.get(
                 f"{SUPABASE_URL}/rest/v1/sensor_readings?select=*&order=created_at.desc&limit=1",
-                headers=HEADERS, timeout=5
+                headers=HEADERS, timeout=10
             )
+            print(f"Supabase status: {r.status_code}, body: {r.text[:200]}")
             data = r.json()
             if not data:
                 return jsonify({
@@ -179,7 +180,7 @@ def latest():
                     "action": "Switch to Local Network mode and turn ON the XIAO Supabase push first."
                 })
             row = data[0]
-            age_sec = (datetime.utcnow() - datetime.fromisoformat(row["created_at"].replace("Z",""))).total_seconds()
+            age_sec = (datetime.utcnow() - datetime.fromisoformat(row["created_at"].replace("Z","").split("+")[0])).total_seconds()
             row["ok"] = True
             row["source"] = "supabase"
             row["data_age_sec"] = int(age_sec)
@@ -193,7 +194,10 @@ def latest():
             row["ml_class"] = pred
             row["ml_confidence"] = conf
             return jsonify(row)
-        except Exception:
+        except Exception as e:
+            print(f"Supabase error: {e}")
+            import traceback
+            traceback.print_exc()
             return jsonify({
                 "ok": False,
                 "source": "supabase",

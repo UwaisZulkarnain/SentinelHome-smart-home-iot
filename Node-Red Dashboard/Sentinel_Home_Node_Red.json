@@ -1,0 +1,313 @@
+[
+    {
+        "id": "353ff3318499fa2d",
+        "type": "tab",
+        "label": "Sentinel_Home_Node_Red",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "74899c983f7aeca7",
+        "type": "inject",
+        "z": "353ff3318499fa2d",
+        "d": true,
+        "name": "Test Temperature",
+        "props": [
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 140,
+        "y": 240,
+        "wires": [
+            [
+                "2bcf3c5f4b39057e"
+            ]
+        ]
+    },
+    {
+        "id": "04950bb0573369d9",
+        "type": "debug",
+        "z": "353ff3318499fa2d",
+        "name": "debug 1",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 840,
+        "y": 340,
+        "wires": []
+    },
+    {
+        "id": "c3924ffcdaeab1d9",
+        "type": "http request",
+        "z": "353ff3318499fa2d",
+        "name": "",
+        "method": "use",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 570,
+        "y": 340,
+        "wires": [
+            [
+                "bb475c5d65aa388b",
+                "04950bb0573369d9"
+            ]
+        ]
+    },
+    {
+        "id": "2bcf3c5f4b39057e",
+        "type": "function",
+        "z": "353ff3318499fa2d",
+        "name": "Prepare Supabase Request",
+        "func": "msg.method = \"GET\";\n\nmsg.url = \"https://ubcyktzfiylqirzpdqnu.supabase.co/rest/v1/sensor_readings?select=*&order=created_at.desc&limit=1\";\n\nmsg.headers = {\n    \"apikey\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InViY3lrdHpmaXlscWlyenBkcW51Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MDkxNjQsImV4cCI6MjA5NzM4NTE2NH0.Gu0jBFdVnsBMFF2VWliTnoKtBqCt_-IwSQfnoe2ts9c\",\n    \"Authorization\": \"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InViY3lrdHpmaXlscWlyenBkcW51Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MDkxNjQsImV4cCI6MjA5NzM4NTE2NH0.Gu0jBFdVnsBMFF2VWliTnoKtBqCt_-IwSQfnoe2ts9c\"\n};\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 260,
+        "y": 340,
+        "wires": [
+            [
+                "c3924ffcdaeab1d9"
+            ]
+        ]
+    },
+    {
+        "id": "bb475c5d65aa388b",
+        "type": "function",
+        "z": "353ff3318499fa2d",
+        "name": "Extract Dashboard Values",
+        "func": "let latest = msg.payload[0];\n\nlet temperatureMsg = { payload: latest.temperature };\nlet humidityMsg = { payload: latest.humidity };\nlet gasMsg = { payload: latest.gas };\nlet motionMsg = { payload: latest.motion == 1 ? \"Motion Detected\" : \"No Motion\" };\nlet nightMsg = { payload: latest.is_night == 1 ? \"Night\" : \"Day\" };\nlet durationMsg = { payload: latest.motion_duration_sec };\n\nreturn [\n    temperatureMsg,\n    humidityMsg,\n    gasMsg,\n    motionMsg,\n    nightMsg,\n    durationMsg\n];",
+        "outputs": 6,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 750,
+        "y": 500,
+        "wires": [
+            [
+                "7399aa9fa1f3ec44"
+            ],
+            [
+                "18b9edaaf5d59110"
+            ],
+            [
+                "d728c28b4e8903fe"
+            ],
+            [
+                "2fea86b145dde791"
+            ],
+            [
+                "5a134df568200f43"
+            ],
+            [
+                "f041abb72458528c"
+            ]
+        ]
+    },
+    {
+        "id": "7399aa9fa1f3ec44",
+        "type": "ui_gauge",
+        "z": "353ff3318499fa2d",
+        "name": "Temperature ",
+        "group": "642f15b22b318426",
+        "order": 5,
+        "width": 0,
+        "height": 0,
+        "gtype": "gage",
+        "title": "Temperature",
+        "label": "°C",
+        "format": "{{value}}",
+        "min": 0,
+        "max": "100",
+        "colors": [
+            "#00b500",
+            "#e6e600",
+            "#ca3838"
+        ],
+        "seg1": "",
+        "seg2": "",
+        "diff": false,
+        "className": "",
+        "x": 1130,
+        "y": 440,
+        "wires": []
+    },
+    {
+        "id": "18b9edaaf5d59110",
+        "type": "ui_gauge",
+        "z": "353ff3318499fa2d",
+        "name": "Humidity ",
+        "group": "642f15b22b318426",
+        "order": 1,
+        "width": 0,
+        "height": 0,
+        "gtype": "gage",
+        "title": "Humidity",
+        "label": "%",
+        "format": "{{value}}",
+        "min": 0,
+        "max": "100",
+        "colors": [
+            "#00b500",
+            "#e6e600",
+            "#ca3838"
+        ],
+        "seg1": "",
+        "seg2": "",
+        "diff": false,
+        "className": "",
+        "x": 1120,
+        "y": 500,
+        "wires": []
+    },
+    {
+        "id": "d728c28b4e8903fe",
+        "type": "ui_gauge",
+        "z": "353ff3318499fa2d",
+        "name": "Gas",
+        "group": "642f15b22b318426",
+        "order": 2,
+        "width": 0,
+        "height": 0,
+        "gtype": "gage",
+        "title": "Gas ",
+        "label": "ppm",
+        "format": "{{value}}",
+        "min": 0,
+        "max": "1000",
+        "colors": [
+            "#00b500",
+            "#e6e600",
+            "#ca3838"
+        ],
+        "seg1": "",
+        "seg2": "",
+        "diff": false,
+        "className": "",
+        "x": 1130,
+        "y": 540,
+        "wires": []
+    },
+    {
+        "id": "2fea86b145dde791",
+        "type": "ui_text",
+        "z": "353ff3318499fa2d",
+        "group": "642f15b22b318426",
+        "order": 3,
+        "width": 0,
+        "height": 0,
+        "name": "Motion Text",
+        "label": "Motion Status",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "style": false,
+        "font": "",
+        "fontSize": 16,
+        "color": "#000000",
+        "x": 1130,
+        "y": 580,
+        "wires": []
+    },
+    {
+        "id": "5a134df568200f43",
+        "type": "ui_text",
+        "z": "353ff3318499fa2d",
+        "group": "642f15b22b318426",
+        "order": 4,
+        "width": 0,
+        "height": 0,
+        "name": "Day Night Text",
+        "label": "Time Condition",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "style": false,
+        "font": "",
+        "fontSize": 16,
+        "color": "#000000",
+        "x": 1120,
+        "y": 620,
+        "wires": []
+    },
+    {
+        "id": "f041abb72458528c",
+        "type": "ui_gauge",
+        "z": "353ff3318499fa2d",
+        "name": "Motion Duration Gauge",
+        "group": "642f15b22b318426",
+        "order": 5,
+        "width": 0,
+        "height": 0,
+        "gtype": "gage",
+        "title": "Motion Duration",
+        "label": "sec",
+        "format": "{{value}}",
+        "min": 0,
+        "max": "300",
+        "colors": [
+            "#00b500",
+            "#e6e600",
+            "#ca3838"
+        ],
+        "seg1": "",
+        "seg2": "",
+        "diff": false,
+        "className": "",
+        "x": 1130,
+        "y": 660,
+        "wires": []
+    },
+    {
+        "id": "642f15b22b318426",
+        "type": "ui_group",
+        "name": "Sensor Readings",
+        "tab": "e0c2cf242bdbdee2",
+        "order": 1,
+        "disp": true,
+        "width": 6,
+        "collapse": false,
+        "className": ""
+    },
+    {
+        "id": "e0c2cf242bdbdee2",
+        "type": "ui_tab",
+        "name": "ML IoT Dashboard",
+        "icon": "dashboard",
+        "disabled": false,
+        "hidden": false
+    },
+    {
+        "id": "d7719245bbdcbcd8",
+        "type": "global-config",
+        "env": [],
+        "modules": {
+            "node-red-dashboard": "3.6.6"
+        }
+    }
+]
