@@ -35,13 +35,19 @@ def ml_predict(temperature, humidity, motion, gas, is_night, motion_duration_sec
     if ml_model is None or ml_scaler is None:
         return None, None
     try:
-        features = np.array([[temperature, humidity, motion, gas, is_night, motion_duration_sec]])
-        features_scaled = ml_scaler.transform(features)
-        prediction = int(ml_model.predict(features_scaled)[0])
-        confidence = float(ml_model.predict_proba(features_scaled)[0][prediction])
+        import pandas as pd
+        numeric = pd.DataFrame([[temperature, humidity, gas, motion_duration_sec]],
+                               columns=["temperature", "humidity", "gas", "motion_duration_sec"])
+        numeric_scaled = ml_scaler.transform(numeric)
+        features = [[numeric_scaled[0][0], numeric_scaled[0][1], motion,
+                     numeric_scaled[0][2], is_night, numeric_scaled[0][3]]]
+        prediction = int(ml_model.predict(features)[0])
+        confidence = float(ml_model.predict_proba(features)[0][prediction])
         return prediction, round(confidence, 3)
     except Exception as e:
         print(f"ML prediction error: {e}")
+        import traceback
+        traceback.print_exc()
         return None, None
 
 current_mode = "local"
@@ -118,6 +124,7 @@ def latest():
             result.get("motion",0), result.get("gas",0),
             result.get("is_night",0), result.get("motion_duration_sec",0)
         )
+        print(f"ML debug - pred:{pred} conf:{conf} features: T:{result.get('temperature')} H:{result.get('humidity')} M:{result.get('motion')} G:{result.get('gas')} N:{result.get('is_night')} DUR:{result.get('motion_duration_sec')}")
         result["ml_class"] = pred
         result["ml_confidence"] = conf
         return jsonify(result)
