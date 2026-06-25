@@ -27,5 +27,6 @@
 #define HUM_THRESHOLD_HIGH  80.0   // % - trigger alarm above this humidity.
 
 #define SUPABASE_JUMPER_PIN   1   // D0 = GPIO1. Jumper to GND = push ON.
+#define NIGHT_JUMPER_PIN  3   // D2 = GPIO3. Jumper to GND = Force Night, floating = Auto.
 
 #endif

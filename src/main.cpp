@@ -4,6 +4,10 @@
 #include <HTTPClient.h>
 #include <time.h>
 #include "config.h"
+#include "model.h"
+
+bool isNight();
+void runML();
 
 DHT dht(DHT_PIN, DHT_TYPE);
 WiFiServer server(80);
@@ -25,6 +29,38 @@ bool cachedNight = false;
 unsigned long lastNightCheck = 0;
 bool supabasePushEnabled = false;
 bool pushError = false;
+int ml_class_result = 0;
+float ml_confidence_result = 0.0;
+
+const float SCALER_MEAN[4]  = {29.737f, 60.312f, 0.0f, 1.249f};
+const float SCALER_SCALE[4] = {5.241f, 10.707f, 1.0f, 2.012f};
+
+void runML() {
+  // Scale continuous features using StandardScaler constants
+  float t_scaled   = (temp - 29.737f) / 5.241f;
+  float h_scaled   = (hum  - 60.312f) / 10.707f;
+  float g_scaled   = ((gas ? 1.0f : 0.0f) - 0.0f) / 1.0f;
+  float dur_scaled = ((float)motionDurationSec - 1.249f) / 2.012f;
+
+  // emlearn expects int16_t features scaled by 100
+  // Feature order: [temp, hum, motion, gas, is_night, dur]
+  int16_t features[6] = {
+    (int16_t)(t_scaled   * 100),
+    (int16_t)(h_scaled   * 100),
+    (int16_t)(motion ? 1 : 0),
+    (int16_t)(g_scaled   * 100),
+    (int16_t)(isNight() ? 1 : 0),
+    (int16_t)(dur_scaled * 100)
+  };
+
+  // Get predicted class
+  ml_class_result = model_predict(features, 6);
+
+  // Get confidence via vote proportions
+  float proba[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+  model_predict_proba(features, 6, proba, 4);
+  ml_confidence_result = proba[ml_class_result];
+}
 
 void setup() {
   Serial.begin(115200);
@@ -36,6 +72,7 @@ void setup() {
   pinMode(STATUS_LED_PIN, OUTPUT);
   digitalWrite(STATUS_LED_PIN, LOW);  // start OFF
   pinMode(SUPABASE_JUMPER_PIN, INPUT_PULLUP);
+  pinMode(NIGHT_JUMPER_PIN, INPUT_PULLUP);
   dht.begin();
 
   // Read jumper state to set Supabase push default
@@ -77,7 +114,6 @@ void setup() {
   Serial.println("Ready");
 }
 
-bool isNight();
 void classify();
 void pushToSupabase() {
   if (WiFi.status() != WL_CONNECTED) {
@@ -99,7 +135,9 @@ void pushToSupabase() {
                 ",\"is_night\":" + String(isNight() ? 1 : 0) +
                 ",\"motion_duration_sec\":" + String(motionDurationSec) +
                 ",\"alert_class\":" + String(currentClass) +
-                ",\"reason\":\"" + currentReason + "\"}";
+                 ",\"reason\":\"" + currentReason + "\"" +
+                 ",\"ml_class\":" + String(ml_class_result) +
+                 ",\"ml_confidence\":" + String(ml_confidence_result, 3) + "}";
   int code = http.POST(body);
   if (code == 201 || code == 200) {
     pushError = false;
@@ -188,13 +226,20 @@ void loop() {
     digitalWrite(STATUS_LED_PIN, (millis() / 500) % 2);
   }
 
+  // Night mode physical jumper — D2/GPIO3 to GND = force night, floating = auto
+  if (digitalRead(NIGHT_JUMPER_PIN) == LOW) {
+    nightModeOverride = 1;
+  } else {
+    if (nightModeOverride == 1) nightModeOverride = -1;
+  }
+
   if (now - lastDHT >= 2000) {
     float t = dht.readTemperature();
     float h = dht.readHumidity();
     if (!isnan(t) && !isnan(h)) { 
       temp = t; hum = h;
-      Serial.printf("T:%.1f H:%.1f M:%d G:%d A:%d N:%d DUR:%lu CLASS:%d REASON:%s\n",
-        temp, hum, motion?1:0, gas?1:0, buzzerOn?1:0, isNight()?1:0, motionDurationSec, currentClass, currentReason.c_str());
+      Serial.printf("T:%.1f H:%.1f M:%d G:%d A:%d N:%d DUR:%lu CLASS:%d REASON:%s ML:%d CONF:%.3f\n",
+        temp, hum, motion?1:0, gas?1:0, buzzerOn?1:0, isNight()?1:0, motionDurationSec, currentClass, currentReason.c_str(), ml_class_result, ml_confidence_result);
     }
     lastDHT = now;
   }
@@ -224,6 +269,7 @@ void loop() {
   }
 
   classify();
+  runML();
 
   if (now - lastSupabase >= 2000 && supabasePushEnabled) {
     pushToSupabase();
@@ -297,8 +343,8 @@ void loop() {
       client.println("Content-Type: application/json");
       client.println("Connection: close");
       client.println();
-      client.printf("{\"t\":%.1f,\"h\":%.1f,\"m\":%d,\"g\":%d,\"a\":%d,\"n\":%d,\"dur\":%lu,\"class\":%d,\"reason\":\"%s\",\"push\":%d}\n",
-        temp, hum, motion?1:0, gas?1:0, buzzerOn?1:0, isNight()?1:0, motionDurationSec, currentClass, currentReason.c_str(), supabasePushEnabled?1:0);
+      client.printf("{\"t\":%.1f,\"h\":%.1f,\"m\":%d,\"g\":%d,\"a\":%d,\"n\":%d,\"dur\":%lu,\"class\":%d,\"reason\":\"%s\",\"push\":%d,\"ml_class\":%d,\"ml_conf\":%.3f}\n",
+        temp, hum, motion?1:0, gas?1:0, buzzerOn?1:0, isNight()?1:0, motionDurationSec, currentClass, currentReason.c_str(), supabasePushEnabled?1:0, ml_class_result, ml_confidence_result);
     }
     client.stop();
   }

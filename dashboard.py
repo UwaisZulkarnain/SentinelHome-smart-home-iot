@@ -7,6 +7,7 @@ import time
 import joblib
 import numpy as np
 import os
+import re
 
 app = Flask(__name__)
 
@@ -18,7 +19,7 @@ HEADERS = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
 SERIAL_PORT = "COM10"
 SERIAL_BAUD = 115200
 
-MODEL_PATH = "ML/random_forest_model.pkl"
+MODEL_PATH = "ML/random_forest_model_40_trees.pkl"
 SCALER_PATH = "ML/scaler.pkl"
 
 ml_model = None
@@ -87,6 +88,10 @@ def serial_reader():
                         "ok": True,
                         "created_at": datetime.utcnow().isoformat()
                     }
+                    ml_val = re.search(r'ML:(\d+)', line)
+                    conf_val = re.search(r'CONF:([\d.]+)', line)
+                    serial_data["ml_class"] = int(ml_val.group(1)) if ml_val else None
+                    serial_data["ml_confidence"] = float(conf_val.group(1)) if conf_val else None
             except Exception:
                 pass
         ser.close()
@@ -125,19 +130,19 @@ def latest():
             result.get("is_night",0), result.get("motion_duration_sec",0)
         )
         print(f"ML debug - pred:{pred} conf:{conf} features: T:{result.get('temperature')} H:{result.get('humidity')} M:{result.get('motion')} G:{result.get('gas')} N:{result.get('is_night')} DUR:{result.get('motion_duration_sec')}")
-        result["ml_class"] = pred
-        result["ml_confidence"] = conf
+        if result.get("ml_class") is None or result.get("ml_confidence") is None:
+            result["ml_class"] = pred
+            result["ml_confidence"] = conf
+            result["ml_source"] = "flask"
+        else:
+            result["ml_source"] = "xiao"
         return jsonify(result)
 
     elif current_mode == "local":
         try:
             r = requests.get(XIAO_URL, timeout=2)
             d = r.json()
-            pred, conf = ml_predict(
-                d.get("t",0), d.get("h",0), d.get("m",0),
-                d.get("g",0), d.get("n",0), d.get("dur",0)
-            )
-            return jsonify({
+            data = {
                 "ok": True,
                 "source": "local",
                 "temperature": d.get("t", 0),
@@ -150,10 +155,21 @@ def latest():
                 "alert_class": d.get("class", 0),
                 "reason": d.get("reason", "normal"),
                 "xiao_push": d.get("push", 0),
-                "created_at": datetime.utcnow().isoformat(),
-                "ml_class": pred,
-                "ml_confidence": conf
-            })
+                "created_at": datetime.utcnow().isoformat()
+            }
+            data["ml_class"] = d.get("ml_class")
+            data["ml_confidence"] = d.get("ml_conf")
+            if data.get("ml_class") is None or data.get("ml_confidence") is None:
+                pred, conf = ml_predict(
+                    d.get("t",0), d.get("h",0), d.get("m",0),
+                    d.get("g",0), d.get("n",0), d.get("dur",0)
+                )
+                data["ml_class"] = pred
+                data["ml_confidence"] = conf
+                data["ml_source"] = "flask"
+            else:
+                data["ml_source"] = "xiao"
+            return jsonify(data)
         except Exception:
             return jsonify({
                 "ok": False,
@@ -186,13 +202,17 @@ def latest():
             row["data_age_sec"] = int(age_sec)
             if age_sec > 30:
                 row["stale_warning"] = f"Data is {int(age_sec)}s old. XIAO may not be pushing."
-            pred, conf = ml_predict(
-                row.get("temperature",0), row.get("humidity",0),
-                row.get("motion",0), row.get("gas",0),
-                row.get("is_night",0), row.get("motion_duration_sec",0)
-            )
-            row["ml_class"] = pred
-            row["ml_confidence"] = conf
+            if row.get("ml_class") is not None and row.get("ml_confidence") is not None:
+                row["ml_source"] = "xiao"
+            else:
+                pred, conf = ml_predict(
+                    row.get("temperature",0), row.get("humidity",0),
+                    row.get("motion",0), row.get("gas",0),
+                    row.get("is_night",0), row.get("motion_duration_sec",0)
+                )
+                row["ml_class"] = pred
+                row["ml_confidence"] = conf
+                row["ml_source"] = "flask"
             return jsonify(row)
         except Exception as e:
             print(f"Supabase error: {e}")
@@ -293,12 +313,12 @@ HTML = """
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:'Segoe UI',sans-serif; background:#0a0e1a; color:#e2e8f0; min-height:100vh; }
+  body { font-family:'Segoe UI',sans-serif; background:#0a0e1a; color:#e2e8f0; min-height:100vh; font-size:15px; }
   .header { background:linear-gradient(135deg,#1e3a5f,#0f2027); padding:20px 30px;
     display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #1e3a5f; }
   .header h1 { font-size:1.6rem; color:#38bdf8; letter-spacing:2px; }
   .header .subtitle { font-size:0.8rem; color:#64748b; margin-top:4px; }
-  .container { max-width:1400px; margin:0 auto; padding:24px; }
+  .container { max-width:1280px; aspect-ratio:16/9; margin:0 auto; padding:24px; }
   .controls { background:#1e293b; border-radius:12px; padding:18px; margin-bottom:20px; border:1px solid #334155; }
   .control-row { display:flex; align-items:center; gap:12px; margin-bottom:14px; flex-wrap:wrap; }
   .control-row:last-child { margin-bottom:0; }
@@ -329,7 +349,7 @@ HTML = """
   .cards { display:grid; grid-template-columns:repeat(5,1fr); gap:16px; margin-bottom:24px; }
   .card { background:#1e293b; border-radius:12px; padding:20px; border:1px solid #334155; text-align:center; }
   .card-icon { font-size:2rem; margin-bottom:8px; }
-  .card-value { font-size:2.2rem; font-weight:700; margin:6px 0; }
+  .card-value { font-size:2rem; font-weight:700; margin:6px 0; }
   .card-label { font-size:0.75rem; color:#64748b; text-transform:uppercase; letter-spacing:1px; }
   .card-status { font-size:0.75rem; font-weight:600; padding:3px 10px; border-radius:10px; display:inline-block; margin-top:6px; }
   .ok { background:rgba(34,197,94,0.15); color:#22c55e; }
@@ -349,6 +369,11 @@ HTML = """
   .badge-gas { background:rgba(239,68,68,0.2); color:#ef4444; }
   .badge-alarm { background:rgba(168,85,247,0.2); color:#a855f7; }
   .footer { text-align:center; padding:20px; color:#334155; font-size:0.75rem; }
+  .ml-engine-badge { background:#1e293b; border:1px solid #2d3a4e; border-radius:8px; padding:10px; margin-top:12px; }
+  .ml-engine-title { color:#38bdf8; font-size:0.9rem; font-weight:600; margin-bottom:8px; }
+  .ml-engine-grid { display:grid; grid-template-columns:1fr 1fr; gap:4px 12px; font-size:0.8rem; }
+  .ml-label { color:#64748b; }
+  .ml-val { color:#e2e8f0; font-weight:600; }
   @media(max-width:900px) { .cards { grid-template-columns:repeat(2,1fr); } .charts { grid-template-columns:1fr; } }
 </style>
 </head>
@@ -376,10 +401,12 @@ HTML = """
     </div>
     <div class="control-row">
       <span class="control-label">🌙 Night Mode</span>
-      <button class="btn" id="btnDay" onclick="setNight('day')">☀️ Force Day</button>
-      <button class="btn" id="btnNight" onclick="setNight('night')">🌑 Force Night</button>
-      <button class="btn" id="btnAuto" onclick="setNight('auto')">🔄 Auto</button>
-      <span style="font-size:0.75rem;color:#64748b;margin-left:4px">⚠ Requires Local Network</span>
+      <div id="nightBtns">
+        <button class="btn" id="btnDay" onclick="setNight('day')">☀️ Force Day</button>
+        <button class="btn" id="btnNight" onclick="setNight('night')">🌑 Force Night</button>
+        <button class="btn" id="btnAuto" onclick="setNight('auto')">🔄 Auto</button>
+      </div>
+      <span id="nightPhysicalMsg" style="font-size:0.8rem;color:#94a3b8;display:none">🔘 Use physical button on XIAO to toggle Day/Night mode</span>
     </div>
     <div class="control-row">
       <span class="control-label">☁️ XIAO → Supabase</span>
@@ -454,6 +481,17 @@ HTML = """
         <strong id="mlConf">--</strong>
       </div>
     </div>
+    <div class="ml-engine-badge">
+      <div class="ml-engine-title">⚡ Edge ML Engine</div>
+      <div class="ml-engine-grid">
+        <span class="ml-label">Model</span><span class="ml-val">Random Forest</span>
+        <span class="ml-label">Trees</span><span class="ml-val">40</span>
+        <span class="ml-label">Inference</span><span class="ml-val">On-device (XIAO)</span>
+        <span class="ml-label">Features</span><span class="ml-val">6 sensor inputs</span>
+        <span class="ml-label">Classes</span><span class="ml-val">4 alert levels</span>
+        <span class="ml-label">Source</span><span class="ml-val" id="mlSourceBadge">—</span>
+      </div>
+    </div>
   </div>
 
   <div class="panel" style="margin-bottom:24px">
@@ -515,6 +553,11 @@ function updateSourceUI(mode) {
   document.getElementById('sourceTag').textContent = tagMap[mode];
   document.getElementById('sourceTag').className = 'source-tag ' + tagClass[mode];
   document.getElementById('sourceStatus').textContent = tagMap[mode];
+
+  // Show/hide night mode buttons based on mode
+  const isLocal = (mode === 'local');
+  document.getElementById('nightBtns').style.display = isLocal ? '' : 'none';
+  document.getElementById('nightPhysicalMsg').style.display = isLocal ? 'none' : '';
 }
 
 async function setMode(mode) {
@@ -600,6 +643,13 @@ async function updateLatest() {
       document.getElementById('mlClass').textContent = mlCls + ' — ' + (classLabelsML[mlCls] || 'Unknown');
       document.getElementById('mlClass').style.color = classColors[mlCls] || '#e2e8f0';
       document.getElementById('mlConf').textContent = mlConf ? (mlConf * 100).toFixed(1) + '%' : '--';
+    }
+
+    const src = d.ml_source || "—";
+    const srcEl = document.getElementById("mlSourceBadge");
+    if (srcEl) {
+      srcEl.textContent = src === "xiao" ? "XIAO TinyML ✅" : src === "flask" ? "Flask fallback" : "—";
+      srcEl.style.color = src === "xiao" ? "#4ade80" : src === "flask" ? "#facc15" : "#94a3b8";
     }
 
     if (d.stale_warning) showWarn(d.stale_warning);

@@ -2,34 +2,30 @@
     {
         "id": "353ff3318499fa2d",
         "type": "tab",
-        "label": "SentinelHome_NodeRED",
+        "label": "Flow 2",
         "disabled": false,
         "info": "",
         "env": []
     },
     {
-        "id": "poll_trigger",
+        "id": "74899c983f7aeca7",
         "type": "inject",
         "z": "353ff3318499fa2d",
-        "name": "Poll Every 2s",
+        "d": true,
+        "name": "Test Temperature",
         "props": [
-            {
-                "p": "payload"
-            },
             {
                 "p": "topic",
                 "vt": "str"
             }
         ],
-        "repeat": "2",
+        "repeat": "",
         "crontab": "",
-        "once": true,
+        "once": false,
         "onceDelay": 0.1,
         "topic": "",
-        "payload": "",
-        "payloadType": "date",
-        "x": 130,
-        "y": 100,
+        "x": 140,
+        "y": 240,
         "wires": [
             [
                 "2bcf3c5f4b39057e"
@@ -37,30 +33,27 @@
         ]
     },
     {
-        "id": "2bcf3c5f4b39057e",
-        "type": "function",
+        "id": "04950bb0573369d9",
+        "type": "debug",
         "z": "353ff3318499fa2d",
-        "name": "Prepare Supabase Request",
-        "func": "msg.method = \"GET\";\nmsg.url = \"https://ubcyktzfiylqirzpdqnu.supabase.co/rest/v1/sensor_readings?select=*&order=created_at.desc&limit=1\";\nmsg.headers = {\n    \"apikey\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InViY3lrdHpmaXlscWlyenBkcW51Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MDkxNjQsImV4cCI6MjA5NzM4NTE2NH0.Gu0jBFdVnsBMFF2VWliTnoKtBqCt_-IwSQfnoe2ts9c\",\n    \"Authorization\": \"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InViY3lrdHpmaXlscWlyenBkcW51Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MDkxNjQsImV4cCI6MjA5NzM4NTE2NH0.Gu0jBFdVnsBMFF2VWliTnoKtBqCt_-IwSQfnoe2ts9c\"\n};\nreturn msg;",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 340,
-        "y": 100,
-        "wires": [
-            [
-                "c3924ffcdaeab1d9"
-            ]
-        ]
+        "name": "debug 1",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 840,
+        "y": 340,
+        "wires": []
     },
     {
         "id": "c3924ffcdaeab1d9",
         "type": "http request",
         "z": "353ff3318499fa2d",
-        "name": "Fetch Supabase",
+        "name": "",
         "method": "use",
         "ret": "obj",
         "paytoqs": "ignore",
@@ -72,11 +65,32 @@
         "authType": "",
         "senderr": false,
         "headers": [],
-        "x": 560,
-        "y": 100,
+        "x": 570,
+        "y": 340,
         "wires": [
             [
-                "bb475c5d65aa388b"
+                "bb475c5d65aa388b",
+                "04950bb0573369d9"
+            ]
+        ]
+    },
+    {
+        "id": "2bcf3c5f4b39057e",
+        "type": "function",
+        "z": "353ff3318499fa2d",
+        "name": "Prepare Supabase Request",
+        "func": "msg.method = \"GET\";\n\nmsg.url = \"https://ubcyktzfiylqirzpdqnu.supabase.co/rest/v1/sensor_readings?select=*&order=created_at.desc&limit=1\";\n\nmsg.headers = {\n    \"apikey\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InViY3lrdHpmaXlscWlyenBkcW51Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MDkxNjQsImV4cCI6MjA5NzM4NTE2NH0.Gu0jBFdVnsBMFF2VWliTnoKtBqCt_-IwSQfnoe2ts9c\",\n    \"Authorization\": \"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InViY3lrdHpmaXlscWlyenBkcW51Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MDkxNjQsImV4cCI6MjA5NzM4NTE2NH0.Gu0jBFdVnsBMFF2VWliTnoKtBqCt_-IwSQfnoe2ts9c\"\n};\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 260,
+        "y": 340,
+        "wires": [
+            [
+                "c3924ffcdaeab1d9"
             ]
         ]
     },
@@ -85,75 +99,105 @@
         "type": "function",
         "z": "353ff3318499fa2d",
         "name": "Extract Dashboard Values",
-        "func": "let latest = msg.payload[0];\nif (!latest) return null;\n\nlet now = new Date();\nlet created = new Date(latest.created_at);\nlet ageSec = Math.floor((now - created) / 1000);\n\nlet classLabels = [\"Normal\", \"Comfort Alert\", \"Warning\", \"Danger\"];\nlet classColors = [\"#22c55e\", \"#fbbf24\", \"#f97316\", \"#ef4444\"];\nlet alertClass = latest.alert_class || 0;\n\nlet mlLabels = [\"Normal\", \"Low Alert\", \"Medium Alert\", \"High Alert\"];\nlet mlClass = latest.ml_class !== null ? latest.ml_class : \"--\";\nlet mlConf = latest.ml_confidence !== null ? (latest.ml_confidence * 100).toFixed(1) + \"%\" : \"--\";\n\nlet temperatureMsg = { payload: latest.temperature };\nlet humidityMsg = { payload: latest.humidity };\nlet gasMsg = { payload: latest.gas };\nlet motionMsg = { payload: latest.motion == 1 ? \"Motion Detected\" : \"No Motion\" };\nlet nightMsg = { payload: latest.is_night == 1 ? \"Night\" : \"Day\" };\nlet durationMsg = { payload: latest.motion_duration_sec || 0 };\nlet classMsg = { payload: alertClass + \" \\u2014 \" + classLabels[alertClass], color: classColors[alertClass] };\nlet reasonMsg = { payload: (latest.reason || \"normal\").replace(/_/g, \" \") };\nlet mlClassMsg = { payload: mlClass !== \"--\" ? mlClass + \" \\u2014 \" + mlLabels[mlClass] : \"--\" };\nlet mlConfMsg = { payload: mlConf };\nlet ageMsg = { payload: ageSec + \"s ago\" };\n\nreturn [\n    temperatureMsg,   // 0\n    humidityMsg,      // 1\n    gasMsg,           // 2\n    motionMsg,        // 3\n    nightMsg,         // 4\n    durationMsg,      // 5\n    classMsg,         // 6\n    reasonMsg,        // 7\n    mlClassMsg,       // 8\n    mlConfMsg,        // 9\n    ageMsg            // 10\n];",
+        "func": "let latest = msg.payload[0];\n\n// Sensor readings\nlet temperatureMsg = {\n    payload: Number(latest.temperature ?? 0)\n};\n\nlet humidityMsg = {\n    payload: Number(latest.humidity ?? 0)\n};\n\nlet gasMsg = {\n    payload: Number(latest.gas ?? 0)\n};\n\n// Motion status\nlet motionMsg = {\n    payload: latest.motion == 1 || latest.motion === true\n        ? \"Motion Detected\"\n        : \"No Motion\"\n};\n\n// Day / night condition\nlet nightMsg = {\n    payload: latest.is_night == 1 || latest.is_night === true\n        ? \"Night\"\n        : \"Day\"\n};\n\n// Motion duration\nlet durationMsg = {\n    payload: Number(latest.motion_duration_sec ?? 0)\n};\n\n// Alert class mapping\nlet alertName = \"Unknown\";\n\nif (latest.alert_class == 0) {\n    alertName = \"Normal\";\n} else if (latest.alert_class == 1) {\n    alertName = \"Low Alert\";\n} else if (latest.alert_class == 2) {\n    alertName = \"Medium Alert\";\n} else if (latest.alert_class == 3) {\n    alertName = \"High Alert\";\n}\n\nlet alertMsg = {\n    payload: alertName\n};\n\n// Alarm status\nlet alarmMsg = {\n    payload: latest.alarm == 1 || latest.alarm === true\n        ? \"Alarm ON\"\n        : \"Alarm OFF\"\n};\n\n// Reason\nlet reasonMsg = {\n    payload: latest.reason ?? \"No reason\"\n};\n\n// ML inference output\nlet mlClassMsg = {\n    payload: latest.ml_class ?? \"Waiting for ML inference\"\n};\n\nlet mlConfidenceMsg = {\n    payload: latest.ml_confidence == null\n        ? \"Waiting for ML confidence\"\n        : `${latest.ml_confidence}%`\n};\n\n// Return messages to 11 outputs\nreturn [\n    temperatureMsg,      // Output 1 → Temperature Gauge\n    humidityMsg,         // Output 2 → Humidity Gauge\n    gasMsg,              // Output 3 → Gas Gauge\n    motionMsg,           // Output 4 → Motion Text\n    nightMsg,            // Output 5 → Day/Night Text\n    durationMsg,         // Output 6 → Motion Duration Gauge\n    alertMsg,            // Output 7 → Alert Class Text\n    alarmMsg,            // Output 8 → Alarm Status Text\n    reasonMsg,           // Output 9 → Reason Text\n    mlClassMsg,          // Output 10 → ML Class Text\n    mlConfidenceMsg      // Output 11 → ML Confidence Text\n];",
         "outputs": 11,
         "timeout": 0,
         "noerr": 0,
         "initialize": "",
         "finalize": "",
         "libs": [],
-        "x": 780,
-        "y": 100,
+        "x": 750,
+        "y": 500,
         "wires": [
-            ["7399aa9fa1f3ec44"],
-            ["18b9edaaf5d59110"],
-            ["d728c28b4e8903fe"],
-            ["2fea86b145dde791"],
-            ["5a134df568200f43"],
-            ["f041abb72458528c"],
-            ["alert_class_text"],
-            ["reason_text"],
-            ["ml_class_text"],
-            ["ml_conf_text"],
-            ["age_text"]
+            [
+                "7399aa9fa1f3ec44"
+            ],
+            [
+                "18b9edaaf5d59110"
+            ],
+            [
+                "d728c28b4e8903fe"
+            ],
+            [
+                "2fea86b145dde791"
+            ],
+            [
+                "5a134df568200f43"
+            ],
+            [
+                "f041abb72458528c"
+            ],
+            [
+                "cf0c8561a96fa7e0"
+            ],
+            [
+                "9fbe6cdcc98198f0"
+            ],
+            [
+                "7fcf5c8103845aff"
+            ],
+            [
+                "f2f427ed35305878"
+            ],
+            [
+                "12955de379df6c88"
+            ]
         ]
     },
     {
         "id": "7399aa9fa1f3ec44",
         "type": "ui_gauge",
         "z": "353ff3318499fa2d",
-        "name": "Temperature",
+        "name": "Temperature ",
         "group": "642f15b22b318426",
         "order": 1,
-        "width": 3,
-        "height": 3,
+        "width": "6",
+        "height": "4",
         "gtype": "gage",
         "title": "Temperature",
         "label": "°C",
         "format": "{{value}}",
         "min": 0,
         "max": "100",
-        "colors": ["#00b500", "#e6e600", "#ca3838"],
+        "colors": [
+            "#00b500",
+            "#e6e600",
+            "#ca3838"
+        ],
         "seg1": "",
         "seg2": "",
         "diff": false,
         "className": "",
-        "x": 1050,
-        "y": 40,
+        "x": 1010,
+        "y": 460,
         "wires": []
     },
     {
         "id": "18b9edaaf5d59110",
         "type": "ui_gauge",
         "z": "353ff3318499fa2d",
-        "name": "Humidity",
+        "name": "Humidity ",
         "group": "642f15b22b318426",
         "order": 2,
-        "width": 3,
-        "height": 3,
+        "width": "6",
+        "height": "4",
         "gtype": "gage",
         "title": "Humidity",
         "label": "%",
         "format": "{{value}}",
         "min": 0,
         "max": "100",
-        "colors": ["#00b500", "#e6e600", "#ca3838"],
+        "colors": [
+            "#00b500",
+            "#e6e600",
+            "#ca3838"
+        ],
         "seg1": "",
         "seg2": "",
         "diff": false,
         "className": "",
-        "x": 1040,
-        "y": 80,
+        "x": 1020,
+        "y": 500,
         "wires": []
     },
     {
@@ -163,21 +207,25 @@
         "name": "Gas",
         "group": "642f15b22b318426",
         "order": 3,
-        "width": 3,
-        "height": 3,
+        "width": "6",
+        "height": "4",
         "gtype": "gage",
-        "title": "Gas",
+        "title": "Gas ",
         "label": "ppm",
         "format": "{{value}}",
         "min": 0,
         "max": "1000",
-        "colors": ["#00b500", "#e6e600", "#ca3838"],
+        "colors": [
+            "#00b500",
+            "#e6e600",
+            "#ca3838"
+        ],
         "seg1": "",
         "seg2": "",
         "diff": false,
         "className": "",
         "x": 1030,
-        "y": 120,
+        "y": 540,
         "wires": []
     },
     {
@@ -185,11 +233,11 @@
         "type": "ui_text",
         "z": "353ff3318499fa2d",
         "group": "642f15b22b318426",
-        "order": 4,
-        "width": 3,
-        "height": 1,
+        "order": 5,
+        "width": "6",
+        "height": "1",
         "name": "Motion Text",
-        "label": "Motion",
+        "label": "Motion Status",
         "format": "{{msg.payload}}",
         "layout": "row-spread",
         "className": "",
@@ -197,8 +245,8 @@
         "font": "",
         "fontSize": 16,
         "color": "#000000",
-        "x": 1040,
-        "y": 160,
+        "x": 1050,
+        "y": 580,
         "wires": []
     },
     {
@@ -206,11 +254,60 @@
         "type": "ui_text",
         "z": "353ff3318499fa2d",
         "group": "642f15b22b318426",
-        "order": 5,
-        "width": 3,
-        "height": 1,
+        "order": 6,
+        "width": "6",
+        "height": "1",
         "name": "Day Night Text",
-        "label": "Time",
+        "label": "Time Condition",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "style": false,
+        "font": "",
+        "fontSize": 16,
+        "color": "#000000",
+        "x": 1060,
+        "y": 620,
+        "wires": []
+    },
+    {
+        "id": "f041abb72458528c",
+        "type": "ui_gauge",
+        "z": "353ff3318499fa2d",
+        "name": "Motion Duration Gauge",
+        "group": "642f15b22b318426",
+        "order": 4,
+        "width": "6",
+        "height": "4",
+        "gtype": "gage",
+        "title": "Motion Duration",
+        "label": "sec",
+        "format": "{{value}}",
+        "min": 0,
+        "max": "300",
+        "colors": [
+            "#00b500",
+            "#e6e600",
+            "#ca3838"
+        ],
+        "seg1": "",
+        "seg2": "",
+        "diff": false,
+        "className": "",
+        "x": 1070,
+        "y": 660,
+        "wires": []
+    },
+    {
+        "id": "cf0c8561a96fa7e0",
+        "type": "ui_text",
+        "z": "353ff3318499fa2d",
+        "group": "642f15b22b318426",
+        "order": 6,
+        "width": "6",
+        "height": "1",
+        "name": "",
+        "label": "Alert Class",
         "format": "{{msg.payload}}",
         "layout": "row-spread",
         "className": "",
@@ -219,63 +316,39 @@
         "fontSize": 16,
         "color": "#000000",
         "x": 1030,
-        "y": 200,
+        "y": 700,
         "wires": []
     },
     {
-        "id": "f041abb72458528c",
-        "type": "ui_gauge",
-        "z": "353ff3318499fa2d",
-        "name": "Motion Duration",
-        "group": "642f15b22b318426",
-        "order": 6,
-        "width": 3,
-        "height": 3,
-        "gtype": "gage",
-        "title": "Motion Duration",
-        "label": "sec",
-        "format": "{{value}}",
-        "min": 0,
-        "max": "300",
-        "colors": ["#00b500", "#e6e600", "#ca3838"],
-        "seg1": "",
-        "seg2": "",
-        "diff": false,
-        "className": "",
-        "x": 1050,
-        "y": 240,
-        "wires": []
-    },
-    {
-        "id": "alert_class_text",
+        "id": "9fbe6cdcc98198f0",
         "type": "ui_text",
         "z": "353ff3318499fa2d",
         "group": "642f15b22b318426",
         "order": 7,
-        "width": 3,
-        "height": 1,
-        "name": "Alert Class",
-        "label": "Alert Class",
-        "format": "<span style='color:{{msg.color}}'>{{msg.payload}}</span>",
+        "width": 0,
+        "height": 0,
+        "name": "",
+        "label": "Alarm Status",
+        "format": "{{msg.payload}}",
         "layout": "row-spread",
         "className": "",
-        "style": true,
+        "style": false,
         "font": "",
         "fontSize": 16,
         "color": "#000000",
-        "x": 1050,
-        "y": 280,
+        "x": 1030,
+        "y": 740,
         "wires": []
     },
     {
-        "id": "reason_text",
+        "id": "7fcf5c8103845aff",
         "type": "ui_text",
         "z": "353ff3318499fa2d",
         "group": "642f15b22b318426",
         "order": 8,
-        "width": 3,
-        "height": 1,
-        "name": "Reason",
+        "width": 0,
+        "height": 0,
+        "name": "",
         "label": "Reason",
         "format": "{{msg.payload}}",
         "layout": "row-spread",
@@ -284,20 +357,20 @@
         "font": "",
         "fontSize": 16,
         "color": "#000000",
-        "x": 1030,
-        "y": 320,
+        "x": 1020,
+        "y": 780,
         "wires": []
     },
     {
-        "id": "ml_class_text",
+        "id": "f2f427ed35305878",
         "type": "ui_text",
         "z": "353ff3318499fa2d",
-        "group": "642f15b22b318426",
-        "order": 9,
-        "width": 3,
-        "height": 1,
+        "group": "cc89f0948713a483",
+        "order": 0,
+        "width": 0,
+        "height": 0,
         "name": "ML Class",
-        "label": "ML Prediction",
+        "label": "ML Class",
         "format": "{{msg.payload}}",
         "layout": "row-spread",
         "className": "",
@@ -305,18 +378,18 @@
         "font": "",
         "fontSize": 16,
         "color": "#000000",
-        "x": 1040,
-        "y": 360,
+        "x": 520,
+        "y": 720,
         "wires": []
     },
     {
-        "id": "ml_conf_text",
+        "id": "12955de379df6c88",
         "type": "ui_text",
         "z": "353ff3318499fa2d",
-        "group": "642f15b22b318426",
-        "order": 10,
-        "width": 3,
-        "height": 1,
+        "group": "cc89f0948713a483",
+        "order": 1,
+        "width": 0,
+        "height": 0,
         "name": "ML Confidence",
         "label": "ML Confidence",
         "format": "{{msg.payload}}",
@@ -326,29 +399,8 @@
         "font": "",
         "fontSize": 16,
         "color": "#000000",
-        "x": 1050,
-        "y": 400,
-        "wires": []
-    },
-    {
-        "id": "age_text",
-        "type": "ui_text",
-        "z": "353ff3318499fa2d",
-        "group": "642f15b22b318426",
-        "order": 11,
-        "width": 3,
-        "height": 1,
-        "name": "Data Age",
-        "label": "Data Age",
-        "format": "{{msg.payload}}",
-        "layout": "row-spread",
-        "className": "",
-        "style": false,
-        "font": "",
-        "fontSize": 16,
-        "color": "#000000",
-        "x": 1030,
-        "y": 440,
+        "x": 720,
+        "y": 740,
         "wires": []
     },
     {
@@ -358,16 +410,35 @@
         "tab": "e0c2cf242bdbdee2",
         "order": 1,
         "disp": true,
-        "width": 6,
+        "width": "12",
+        "collapse": false,
+        "className": ""
+    },
+    {
+        "id": "cc89f0948713a483",
+        "type": "ui_group",
+        "name": "ML Inference",
+        "tab": "e0c2cf242bdbdee2",
+        "order": 2,
+        "disp": true,
+        "width": "12",
         "collapse": false,
         "className": ""
     },
     {
         "id": "e0c2cf242bdbdee2",
         "type": "ui_tab",
-        "name": "SentinelHome",
+        "name": "ML IoT Dashboard",
         "icon": "dashboard",
         "disabled": false,
         "hidden": false
+    },
+    {
+        "id": "c67a39d1670e59ba",
+        "type": "global-config",
+        "env": [],
+        "modules": {
+            "node-red-dashboard": "3.6.6"
+        }
     }
 ]
