@@ -19,8 +19,8 @@ HEADERS = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
 SERIAL_PORT = "COM10"
 SERIAL_BAUD = 115200
 
-MODEL_PATH = "ML/random_forest_model_40_trees.pkl"
-SCALER_PATH = "ML/scaler.pkl"
+MODEL_PATH = "ML/ML\new_random_forest_model_n70.pkl"
+SCALER_PATH = "ML\scaler_n70.pkl"
 
 ml_model = None
 ml_scaler = None
