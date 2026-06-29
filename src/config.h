@@ -6,7 +6,7 @@
 // === SENSOR PINS ===
 // Physical wiring: MQ=D8(GPIO7), PIR=D9(GPIO8), DHT=D10(GPIO9)
 #define MQ2_PIN      7   // D8 = GPIO7
-#define PIR_PIN      8   // D9 = GPIO8
+#define PIR_PIN      4   // D4 = GPIO4
 #define DHT_PIN      9   // D10 = GPIO9
 #define BUZZER_PIN   44   // D7 = GPIO44, placeholder until buzzer is wired
 
@@ -27,6 +27,6 @@
 #define HUM_THRESHOLD_HIGH  80.0   // % - trigger alarm above this humidity.
 
 #define SUPABASE_JUMPER_PIN   1   // D0 = GPIO1. Jumper to GND = push ON.
-#define NIGHT_JUMPER_PIN  3   // D2 = GPIO3. Jumper to GND = Force Night, floating = Auto.
+#define NIGHT_JUMPER_PIN  3   // D2 = GPIO5. Jumper to GND = Force Night, floating = Auto.
 
 #endif

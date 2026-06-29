@@ -64,8 +64,8 @@ void runML() {
 
 void setup() {
   Serial.begin(115200);
-  pinMode(PIR_PIN, INPUT);
-  pinMode(MQ2_PIN, INPUT);
+  pinMode(PIR_PIN, INPUT_PULLUP);
+  pinMode(MQ2_PIN, INPUT_PULLUP);
   pinMode(BUZZER_PIN, OUTPUT);
   pinMode(DHT_PIN, INPUT_PULLUP);
   digitalWrite(BUZZER_PIN, LOW);
@@ -152,6 +152,7 @@ void pushToSupabase() {
 bool isNight() {
   if (nightModeOverride == 1) return true;
   if (nightModeOverride == 0) return false;
+  // auto mode — use NTP
   unsigned long now = millis();
   if (now - lastNightCheck >= 3600000UL || lastNightCheck == 0) {
     struct tm timeinfo;
@@ -217,6 +218,7 @@ void loop() {
 
   // Status LED: OFF when push disabled
   if (!supabasePushEnabled) {
+
     pushError = false;
     digitalWrite(STATUS_LED_PIN, LOW);
   }
@@ -225,13 +227,12 @@ void loop() {
   if (supabasePushEnabled && pushError) {
     digitalWrite(STATUS_LED_PIN, (millis() / 500) % 2);
   }
-
   // Night mode physical jumper — D2/GPIO3 to GND = force night, floating = auto
   if (digitalRead(NIGHT_JUMPER_PIN) == LOW) {
-    nightModeOverride = 1;
-  } else {
-    if (nightModeOverride == 1) nightModeOverride = -1;
-  }
+    nightModeOverride = 1;  // jumper in = force night
+} else {
+    nightModeOverride = 0;  // jumper out = force day
+}
 
   if (now - lastDHT >= 2000) {
     float t = dht.readTemperature();
@@ -264,9 +265,11 @@ void loop() {
     lastPIR = now;
   }
   if (now - lastMQ2 >= 1000) {
-    gas = digitalRead(MQ2_PIN) == LOW;
+    int aoVal = analogRead(MQ2_PIN);
+    gas = (aoVal > 3200);
+    Serial.printf("MQ2_AO:%d GAS:%d\n", aoVal, gas?1:0);
     lastMQ2 = now;
-  }
+}
 
   classify();
   runML();

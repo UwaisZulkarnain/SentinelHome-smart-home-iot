@@ -214,7 +214,7 @@
         "label": "ppm",
         "format": "{{value}}",
         "min": 0,
-        "max": "1000",
+        "max": "1",
         "colors": [
             "#00b500",
             "#e6e600",
@@ -346,8 +346,8 @@
         "z": "353ff3318499fa2d",
         "group": "642f15b22b318426",
         "order": 8,
-        "width": 0,
-        "height": 0,
+        "width": "12",
+        "height": "1",
         "name": "",
         "label": "Reason",
         "format": "{{msg.payload}}",
@@ -372,7 +372,7 @@
         "name": "ML Class",
         "label": "ML Class",
         "format": "{{msg.payload}}",
-        "layout": "row-spread",
+        "layout": "col-center",
         "className": "",
         "style": false,
         "font": "",
@@ -393,7 +393,7 @@
         "name": "ML Confidence",
         "label": "ML Confidence",
         "format": "{{msg.payload}}",
-        "layout": "row-spread",
+        "layout": "col-center",
         "className": "",
         "style": false,
         "font": "",
@@ -428,13 +428,13 @@
     {
         "id": "e0c2cf242bdbdee2",
         "type": "ui_tab",
-        "name": "ML IoT Dashboard",
+        "name": "SENTINEL HOME DASHBOARD",
         "icon": "dashboard",
         "disabled": false,
         "hidden": false
     },
     {
-        "id": "c67a39d1670e59ba",
+        "id": "4255d4908aa65124",
         "type": "global-config",
         "env": [],
         "modules": {

@@ -8,6 +8,58 @@ import joblib
 import numpy as np
 import os
 import re
+import pygame
+import threading
+tts_available = False
+tts_last_played = {1: 0, 2: 0, 3: 0}
+tts_last_class = 0
+
+def init_tts():
+    global tts_available
+    try:
+        pygame.mixer.init()
+        tts_available = True
+        print("[TTS] Audio ready")
+    except Exception as e:
+        print(f"[TTS] Audio unavailable: {e}")
+
+def speak_alert(alert_class):
+    global tts_last_class, tts_last_played
+    if not tts_available:
+        return
+    if alert_class == 0:
+        tts_last_class = 0
+        return
+
+    now = time.time()
+
+    # Repeat intervals per class
+    repeat_interval = {1: 999999, 2: 30, 3: 10}
+
+    # Play if class changed OR repeat interval passed
+    class_changed = (alert_class != tts_last_class)
+    interval_passed = (now - tts_last_played.get(alert_class, 0)) >= repeat_interval[alert_class]
+
+    if not (class_changed or interval_passed):
+        return
+
+    tts_last_class = alert_class
+    tts_last_played[alert_class] = now
+
+    def play():
+        try:
+            for lang in ['bm', 'en']:
+                path = f"warnings/class{alert_class}_{lang}.mp3"
+                if os.path.exists(path):
+                    pygame.mixer.music.load(path)
+                    pygame.mixer.music.play()
+                    while pygame.mixer.music.get_busy():
+                        time.sleep(0.1)
+                    time.sleep(0.4)
+        except Exception as e:
+            print(f"[TTS Error] {e}")
+
+    threading.Thread(target=play, daemon=True).start()
 
 app = Flask(__name__)
 
@@ -19,8 +71,8 @@ HEADERS = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
 SERIAL_PORT = "COM10"
 SERIAL_BAUD = 115200
 
-MODEL_PATH = "ML/ML\new_random_forest_model_n70.pkl"
-SCALER_PATH = "ML\scaler_n70.pkl"
+MODEL_PATH = "ML\\new_random_forest_model_n70.pkl"
+SCALER_PATH = "ML\\scaler_n70.pkl"
 
 ml_model = None
 ml_scaler = None
@@ -32,24 +84,11 @@ try:
 except Exception as e:
     print(f"ML model not loaded: {e}")
 
+init_tts()
+
+# ml_predict disabled — ML inference runs on XIAO TinyML directly
 def ml_predict(temperature, humidity, motion, gas, is_night, motion_duration_sec):
-    if ml_model is None or ml_scaler is None:
-        return None, None
-    try:
-        import pandas as pd
-        numeric = pd.DataFrame([[temperature, humidity, gas, motion_duration_sec]],
-                               columns=["temperature", "humidity", "gas", "motion_duration_sec"])
-        numeric_scaled = ml_scaler.transform(numeric)
-        features = [[numeric_scaled[0][0], numeric_scaled[0][1], motion,
-                     numeric_scaled[0][2], is_night, numeric_scaled[0][3]]]
-        prediction = int(ml_model.predict(features)[0])
-        confidence = float(ml_model.predict_proba(features)[0][prediction])
-        return prediction, round(confidence, 3)
-    except Exception as e:
-        print(f"ML prediction error: {e}")
-        import traceback
-        traceback.print_exc()
-        return None, None
+    return None, None
 
 current_mode = "local"
 serial_data = None
@@ -124,18 +163,8 @@ def latest():
                 "action": "Wait a few seconds for XIAO to send data, or check that XIAO is powered on."
             })
         result = dict(serial_data)
-        pred, conf = ml_predict(
-            result.get("temperature",0), result.get("humidity",0),
-            result.get("motion",0), result.get("gas",0),
-            result.get("is_night",0), result.get("motion_duration_sec",0)
-        )
-        print(f"ML debug - pred:{pred} conf:{conf} features: T:{result.get('temperature')} H:{result.get('humidity')} M:{result.get('motion')} G:{result.get('gas')} N:{result.get('is_night')} DUR:{result.get('motion_duration_sec')}")
-        if result.get("ml_class") is None or result.get("ml_confidence") is None:
-            result["ml_class"] = pred
-            result["ml_confidence"] = conf
-            result["ml_source"] = "flask"
-        else:
-            result["ml_source"] = "xiao"
+        result["ml_source"] = "xiao" if result.get("ml_class") is not None else "none"
+        speak_alert(int(result.get("alert_class", 0) or 0))
         return jsonify(result)
 
     elif current_mode == "local":
@@ -159,16 +188,8 @@ def latest():
             }
             data["ml_class"] = d.get("ml_class")
             data["ml_confidence"] = d.get("ml_conf")
-            if data.get("ml_class") is None or data.get("ml_confidence") is None:
-                pred, conf = ml_predict(
-                    d.get("t",0), d.get("h",0), d.get("m",0),
-                    d.get("g",0), d.get("n",0), d.get("dur",0)
-                )
-                data["ml_class"] = pred
-                data["ml_confidence"] = conf
-                data["ml_source"] = "flask"
-            else:
-                data["ml_source"] = "xiao"
+            data["ml_source"] = "xiao" if data.get("ml_class") is not None else "none"
+            speak_alert(int(data.get("alert_class", 0) or 0))
             return jsonify(data)
         except Exception:
             return jsonify({
@@ -202,17 +223,8 @@ def latest():
             row["data_age_sec"] = int(age_sec)
             if age_sec > 30:
                 row["stale_warning"] = f"Data is {int(age_sec)}s old. XIAO may not be pushing."
-            if row.get("ml_class") is not None and row.get("ml_confidence") is not None:
-                row["ml_source"] = "xiao"
-            else:
-                pred, conf = ml_predict(
-                    row.get("temperature",0), row.get("humidity",0),
-                    row.get("motion",0), row.get("gas",0),
-                    row.get("is_night",0), row.get("motion_duration_sec",0)
-                )
-                row["ml_class"] = pred
-                row["ml_confidence"] = conf
-                row["ml_source"] = "flask"
+            row["ml_source"] = "xiao" if row.get("ml_class") is not None else "none"
+            speak_alert(int(row.get("alert_class", 0) or 0))
             return jsonify(row)
         except Exception as e:
             print(f"Supabase error: {e}")
@@ -303,6 +315,17 @@ def alerts():
     except Exception:
         return jsonify([])
 
+@app.route("/api/tts_status")
+def tts_status():
+    cls = tts_last_class
+    messages = {
+        0: None,
+        1: {"bm": "Perhatian. Keadaan tidak selesa dikesan. Sila semak persekitaran anda.", "en": "Attention. Comfort alert detected. Please check your environment."},
+        2: {"bm": "Amaran. Situasi membimbangkan dikesan. Sila ambil tindakan segera.", "en": "Warning. Concerning situation detected. Please take action immediately."},
+        3: {"bm": "Bahaya! Keadaan berbahaya dikesan! Sila keluar dari kawasan ini sekarang!", "en": "Danger! Hazardous condition detected! Please evacuate the area immediately!"}
+    }
+    return jsonify({"alert_class": cls, "message": messages.get(cls)})
+
 HTML = """
 <!DOCTYPE html>
 <html lang="en">
@@ -312,69 +335,142 @@ HTML = """
 <title>SentinelHome Dashboard</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap');
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:'Segoe UI',sans-serif; background:#0a0e1a; color:#e2e8f0; min-height:100vh; font-size:15px; }
-  .header { background:linear-gradient(135deg,#1e3a5f,#0f2027); padding:20px 30px;
-    display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #1e3a5f; }
-  .header h1 { font-size:1.6rem; color:#38bdf8; letter-spacing:2px; }
-  .header .subtitle { font-size:0.8rem; color:#64748b; margin-top:4px; }
-  .container { max-width:1280px; aspect-ratio:16/9; margin:0 auto; padding:24px; }
-  .controls { background:#1e293b; border-radius:12px; padding:18px; margin-bottom:20px; border:1px solid #334155; }
-  .control-row { display:flex; align-items:center; gap:12px; margin-bottom:14px; flex-wrap:wrap; }
+  :root {
+    --bg:#070b14; --panel:#0f1729; --panel-2:#131d33; --line:#1f2c44;
+    --text:#e6edf7; --muted:#7a8aa3; --dim:#4a5872;
+    --accent:#38bdf8; --accent-2:#818cf8;
+    --ok:#22c55e; --warn:#f59e0b; --danger:#ef4444;
+    --radius:16px;
+  }
+  body {
+    font-family:'Inter',-apple-system,'Segoe UI',sans-serif;
+    background:
+      radial-gradient(900px 500px at 12% -8%, rgba(56,189,248,0.10), transparent 60%),
+      radial-gradient(800px 500px at 100% 0%, rgba(129,140,248,0.10), transparent 55%),
+      var(--bg);
+    background-attachment:fixed;
+    color:var(--text); min-height:100vh; font-size:16px;
+    -webkit-font-smoothing:antialiased; letter-spacing:0.1px;
+  }
+  .header {
+    background:linear-gradient(135deg, rgba(30,58,95,0.55), rgba(15,32,39,0.35));
+    backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+    padding:22px 40px; display:flex; align-items:center; justify-content:space-between;
+    border-bottom:1px solid var(--line);
+    position:sticky; top:0; z-index:50;
+  }
+  .header h1 {
+    font-size:2rem; font-weight:800; letter-spacing:1.5px;
+    background:linear-gradient(90deg,#7dd3fc,#a5b4fc);
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+  }
+  .header .subtitle { font-size:0.9rem; color:var(--muted); margin-top:6px; font-weight:500; }
+  .container { max-width:1480px; margin:0 auto; padding:32px 40px; }
+  .controls {
+    background:linear-gradient(180deg, var(--panel-2), var(--panel));
+    border-radius:var(--radius); padding:22px 24px; margin-bottom:24px;
+    border:1px solid var(--line); box-shadow:0 10px 40px -20px rgba(0,0,0,0.8);
+  }
+  .control-row { display:flex; align-items:center; gap:14px; margin-bottom:16px; flex-wrap:wrap; }
   .control-row:last-child { margin-bottom:0; }
-  .control-label { font-size:0.8rem; color:#94a3b8; min-width:140px; font-weight:600; }
-  .btn { background:#334155; color:#e2e8f0; border:none; padding:8px 16px; border-radius:8px;
-    cursor:pointer; font-size:0.8rem; font-weight:600; transition:all 0.15s; }
-  .btn:hover { background:#475569; }
-  .btn.active-serial { background:#f59e0b; color:#0a0e1a; }
-  .btn.active-local { background:#38bdf8; color:#0a0e1a; }
-  .btn.active-supabase { background:#a855f7; color:#fff; }
-  .btn.active-night { background:#6366f1; color:#fff; }
-  .btn.active-day { background:#fbbf24; color:#0a0e1a; }
-  .btn.active-auto { background:#22c55e; color:#0a0e1a; }
-  .btn.active-on { background:#22c55e; color:#0a0e1a; }
-  .btn.active-off { background:#ef4444; color:#fff; }
-  .source-tag { font-size:0.7rem; padding:2px 10px; border-radius:10px; font-weight:700; }
-  .tag-serial { background:rgba(245,158,11,0.2); color:#f59e0b; }
-  .tag-local { background:rgba(56,189,248,0.2); color:#38bdf8; }
-  .tag-supabase { background:rgba(168,85,247,0.2); color:#a855f7; }
-  .error-banner { background:#7f1d1d; border:1px solid #ef4444; color:#fecaca;
-    padding:14px 18px; border-radius:10px; margin-bottom:20px; display:none; }
+  .control-label { font-size:0.92rem; color:var(--muted); min-width:160px; font-weight:700; letter-spacing:0.3px; }
+  .btn {
+    background:rgba(255,255,255,0.04); color:var(--text);
+    border:1px solid rgba(255,255,255,0.08); padding:10px 18px; border-radius:11px;
+    cursor:pointer; font-size:0.9rem; font-weight:600; font-family:inherit;
+    transition:transform .12s ease, background .15s, border-color .15s, box-shadow .15s;
+  }
+  .btn:hover { background:rgba(255,255,255,0.09); border-color:rgba(255,255,255,0.18); transform:translateY(-1px); }
+  .btn:active { transform:translateY(0); }
+  .btn.active-serial { background:var(--warn); color:#0a0e1a; border-color:transparent; box-shadow:0 0 22px -4px rgba(245,158,11,0.6); }
+  .btn.active-local { background:var(--accent); color:#0a0e1a; border-color:transparent; box-shadow:0 0 22px -4px rgba(56,189,248,0.6); }
+  .btn.active-supabase { background:var(--accent-2); color:#0a0e1a; border-color:transparent; box-shadow:0 0 22px -4px rgba(129,140,248,0.6); }
+  .btn.active-night { background:#6366f1; color:#fff; border-color:transparent; }
+  .btn.active-day { background:#fbbf24; color:#0a0e1a; border-color:transparent; }
+  .btn.active-auto { background:var(--ok); color:#0a0e1a; border-color:transparent; }
+  .btn.active-on { background:var(--ok); color:#0a0e1a; border-color:transparent; }
+  .btn.active-off { background:var(--danger); color:#fff; border-color:transparent; }
+  .source-tag { font-size:0.78rem; padding:4px 14px; border-radius:999px; font-weight:700; letter-spacing:0.5px; }
+  .tag-serial { background:rgba(245,158,11,0.18); color:var(--warn); border:1px solid rgba(245,158,11,0.3); }
+  .tag-local { background:rgba(56,189,248,0.18); color:var(--accent); border:1px solid rgba(56,189,248,0.3); }
+  .tag-supabase { background:rgba(129,140,248,0.18); color:var(--accent-2); border:1px solid rgba(129,140,248,0.3); }
+  .error-banner { background:linear-gradient(180deg,#5b1414,#3f0d0d); border:1px solid rgba(239,68,68,0.5); color:#fecaca;
+    padding:16px 20px; border-radius:13px; margin-bottom:22px; display:none; }
   .error-banner.show { display:block; }
-  .warn-banner { background:#78350f; border:1px solid #f59e0b; color:#fde68a;
-    padding:10px 18px; border-radius:10px; margin-bottom:20px; display:none; }
+  .warn-banner { background:linear-gradient(180deg,#5e2c0a,#3f1e06); border:1px solid rgba(245,158,11,0.5); color:#fde68a;
+    padding:12px 20px; border-radius:13px; margin-bottom:22px; display:none; }
   .warn-banner.show { display:block; }
-  .err-title { font-weight:700; margin-bottom:4px; }
-  .err-action { font-size:0.85rem; margin-top:6px; opacity:0.85; }
-  .cards { display:grid; grid-template-columns:repeat(5,1fr); gap:16px; margin-bottom:24px; }
-  .card { background:#1e293b; border-radius:12px; padding:20px; border:1px solid #334155; text-align:center; }
-  .card-icon { font-size:2rem; margin-bottom:8px; }
-  .card-value { font-size:2rem; font-weight:700; margin:6px 0; }
-  .card-label { font-size:0.75rem; color:#64748b; text-transform:uppercase; letter-spacing:1px; }
-  .card-status { font-size:0.75rem; font-weight:600; padding:3px 10px; border-radius:10px; display:inline-block; margin-top:6px; }
-  .ok { background:rgba(34,197,94,0.15); color:#22c55e; }
-  .warn { background:rgba(245,158,11,0.15); color:#f59e0b; }
-  .danger { background:rgba(239,68,68,0.15); color:#ef4444; }
-  .charts { display:grid; grid-template-columns:2fr 1fr; gap:16px; margin-bottom:24px; }
-  .panel { background:#1e293b; border-radius:12px; padding:20px; border:1px solid #334155; }
-  .panel h3 { color:#38bdf8; font-size:1rem; margin-bottom:16px; padding-bottom:10px; border-bottom:1px solid #334155; }
-  .status-row { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #0f172a; font-size:0.85rem; }
+  .err-title { font-weight:700; margin-bottom:5px; font-size:1.02rem; }
+  .err-action { font-size:0.9rem; margin-top:7px; opacity:0.88; }
+  .cards { display:grid; grid-template-columns:repeat(5,1fr); gap:18px; margin-bottom:26px; }
+  .card {
+    background:linear-gradient(180deg, var(--panel-2), var(--panel));
+    border-radius:var(--radius); padding:24px 18px; border:1px solid var(--line);
+    text-align:center; position:relative; overflow:hidden;
+    transition:transform .15s ease, border-color .15s;
+  }
+  .card::before {
+    content:''; position:absolute; inset:0 0 auto 0; height:3px;
+    background:linear-gradient(90deg, transparent, var(--accent), transparent); opacity:0.5;
+  }
+  .card:hover { transform:translateY(-3px); border-color:rgba(56,189,248,0.35); }
+  .card-icon { font-size:2.3rem; margin-bottom:10px; filter:drop-shadow(0 2px 8px rgba(0,0,0,0.4)); }
+  .card-value { font-size:2.5rem; font-weight:800; margin:6px 0; line-height:1.05; letter-spacing:-0.5px; }
+  .card-label { font-size:0.8rem; color:var(--dim); text-transform:uppercase; letter-spacing:1.5px; font-weight:600; }
+  .card-status { font-size:0.82rem; font-weight:700; padding:4px 13px; border-radius:999px; display:inline-block; margin-top:10px; }
+  .ok { background:rgba(34,197,94,0.16); color:var(--ok); }
+  .warn { background:rgba(245,158,11,0.16); color:var(--warn); }
+  .danger { background:rgba(239,68,68,0.16); color:var(--danger); }
+  .charts { display:grid; grid-template-columns:2fr 1fr; gap:18px; margin-bottom:26px; }
+  .panel {
+    background:linear-gradient(180deg, var(--panel-2), var(--panel));
+    border-radius:var(--radius); padding:24px; border:1px solid var(--line);
+    box-shadow:0 10px 40px -24px rgba(0,0,0,0.9);
+  }
+  .panel h3 { color:var(--accent); font-size:1.08rem; font-weight:700; margin-bottom:18px; padding-bottom:12px; border-bottom:1px solid var(--line); letter-spacing:0.3px; }
+  .status-row { display:flex; justify-content:space-between; align-items:center; padding:11px 0; border-bottom:1px solid rgba(31,44,68,0.6); font-size:0.92rem; }
   .status-row:last-child { border-bottom:none; }
-  .status-label { color:#64748b; }
-  table { width:100%; border-collapse:collapse; font-size:0.85rem; }
-  th { background:#0f172a; color:#38bdf8; padding:10px 14px; text-align:left; font-weight:600; }
-  td { padding:10px 14px; border-bottom:1px solid #1e293b; color:#cbd5e1; }
-  .badge { padding:3px 10px; border-radius:10px; font-size:0.75rem; font-weight:bold; }
-  .badge-motion { background:rgba(245,158,11,0.2); color:#f59e0b; }
-  .badge-gas { background:rgba(239,68,68,0.2); color:#ef4444; }
-  .badge-alarm { background:rgba(168,85,247,0.2); color:#a855f7; }
-  .footer { text-align:center; padding:20px; color:#334155; font-size:0.75rem; }
-  .ml-engine-badge { background:#1e293b; border:1px solid #2d3a4e; border-radius:8px; padding:10px; margin-top:12px; }
-  .ml-engine-title { color:#38bdf8; font-size:0.9rem; font-weight:600; margin-bottom:8px; }
-  .ml-engine-grid { display:grid; grid-template-columns:1fr 1fr; gap:4px 12px; font-size:0.8rem; }
-  .ml-label { color:#64748b; }
-  .ml-val { color:#e2e8f0; font-weight:600; }
-  @media(max-width:900px) { .cards { grid-template-columns:repeat(2,1fr); } .charts { grid-template-columns:1fr; } }
+  .status-label { color:var(--muted); font-weight:500; }
+  .status-row strong { font-weight:700; }
+  table { width:100%; border-collapse:collapse; font-size:0.9rem; }
+  th { background:rgba(15,23,41,0.8); color:var(--accent); padding:12px 16px; text-align:left; font-weight:700; letter-spacing:0.4px; text-transform:uppercase; font-size:0.78rem; }
+  th:first-child { border-radius:10px 0 0 10px; }
+  th:last-child { border-radius:0 10px 10px 0; }
+  td { padding:12px 16px; border-bottom:1px solid rgba(31,44,68,0.5); color:#c2cfe2; }
+  tr:hover td { background:rgba(56,189,248,0.04); }
+  .badge { padding:4px 12px; border-radius:999px; font-size:0.76rem; font-weight:700; letter-spacing:0.3px; }
+  .badge-motion { background:rgba(245,158,11,0.2); color:var(--warn); }
+  .badge-gas { background:rgba(239,68,68,0.2); color:var(--danger); }
+  .badge-alarm { background:rgba(168,85,247,0.2); color:#c084fc; }
+  .footer { text-align:center; padding:26px; color:var(--dim); font-size:0.82rem; letter-spacing:0.5px; }
+  .ml-engine-badge {
+    background:linear-gradient(180deg, var(--panel-2), var(--panel));
+    border:1px solid var(--line); border-radius:var(--radius); padding:18px 20px; margin-top:0;
+  }
+  .ml-engine-title { color:var(--accent); font-size:1rem; font-weight:700; margin-bottom:14px; letter-spacing:0.3px; }
+  .ml-engine-grid { display:grid; grid-template-columns:1fr 1fr; gap:9px 16px; font-size:0.88rem; }
+  .ml-label { color:var(--muted); font-weight:500; }
+  .ml-val { color:var(--text); font-weight:700; font-family:'JetBrains Mono',monospace; }
+  .container { max-width:1280px; margin:0 auto; padding:24px 32px; }
+  .tts-banner {
+    display:none; align-items:center; gap:14px;
+    background:linear-gradient(135deg, rgba(239,68,68,0.15), rgba(245,158,11,0.10));
+    border:1px solid rgba(239,68,68,0.4); border-radius:13px;
+    padding:14px 20px; margin-bottom:20px;
+    animation: pulse-border 1.5s ease-in-out infinite;
+  }
+  .tts-banner.show { display:flex; }
+  .tts-icon { font-size:1.6rem; flex-shrink:0; }
+  .tts-text { flex:1; }
+  .tts-label { font-size:0.75rem; color:var(--muted); font-weight:700; text-transform:uppercase; letter-spacing:1px; margin-bottom:3px; }
+  .tts-bm { font-size:1rem; font-weight:700; color:#fde68a; margin-bottom:2px; }
+  .tts-en { font-size:0.88rem; color:#fca5a5; font-weight:500; }
+  .tts-class-badge { font-size:0.78rem; font-weight:800; padding:5px 14px; border-radius:999px; flex-shrink:0; }
+  @keyframes pulse-border { 0%,100% { border-color:rgba(239,68,68,0.4); } 50% { border-color:rgba(239,68,68,0.9); } }
+  @media(max-width:1100px) { .cards { grid-template-columns:repeat(3,1fr); } .charts { grid-template-columns:1fr; } }
+  @media(max-width:680px) { .cards { grid-template-columns:repeat(2,1fr); } .container { padding:20px; } }
 </style>
 </head>
 <body>
@@ -414,6 +510,16 @@ HTML = """
       <button class="btn" id="btnPushOff" onclick="setPush(false)">⏹ Turn OFF</button>
       <span style="font-size:0.75rem;color:#64748b;margin-left:4px">⚠ Requires Local Network</span>
     </div>
+  </div>
+
+  <div id="ttsBanner" class="tts-banner">
+    <div class="tts-icon" id="ttsIcon">🔊</div>
+    <div class="tts-text">
+      <div class="tts-label">🔊 Voice Alert Broadcasting</div>
+      <div class="tts-bm" id="ttsBm">--</div>
+      <div class="tts-en" id="ttsEn">--</div>
+    </div>
+    <span class="tts-class-badge" id="ttsClassBadge">--</span>
   </div>
 
   <div id="errorBanner" class="error-banner">
@@ -711,6 +817,35 @@ async function refresh() {
 initChart();
 refresh();
 setInterval(refresh, 1000);
+
+const ttsMessages = {
+  1: { bm: "Perhatian. Keadaan tidak selesa dikesan. Sila semak persekitaran anda.", en: "Attention. Comfort alert detected. Please check your environment." },
+  2: { bm: "Amaran. Situasi membimbangkan dikesan. Sila ambil tindakan segera.", en: "Warning. Concerning situation detected. Please take action immediately." },
+  3: { bm: "Bahaya! Keadaan berbahaya dikesan! Sila keluar dari kawasan ini sekarang!", en: "Danger! Hazardous condition detected! Please evacuate the area immediately!" }
+};
+const ttsBadgeColors = { 1:'#fbbf24', 2:'#f97316', 3:'#ef4444' };
+const ttsBadgeLabels = { 1:'CLASS 1', 2:'CLASS 2', 3:'CLASS 3' };
+
+async function updateTTS() {
+  try {
+    const d = await fetch('/api/tts_status').then(r => r.json());
+    const cls = d.alert_class;
+    const banner = document.getElementById('ttsBanner');
+    if (cls && cls > 0 && ttsMessages[cls]) {
+      document.getElementById('ttsBm').textContent = ttsMessages[cls].bm;
+      document.getElementById('ttsEn').textContent = ttsMessages[cls].en;
+      const badge = document.getElementById('ttsClassBadge');
+      badge.textContent = ttsBadgeLabels[cls];
+      badge.style.background = ttsBadgeColors[cls] + '33';
+      badge.style.color = ttsBadgeColors[cls];
+      banner.classList.add('show');
+    } else {
+      banner.classList.remove('show');
+    }
+  } catch(e) {}
+}
+setInterval(updateTTS, 1500);
+updateTTS();
 </script>
 </body>
 </html>
